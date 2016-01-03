@@ -1,0 +1,174 @@
+package rest
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+)
+
+// CompressData разрешает поддержку сжатия данных, если это поддерживается браузером.
+// Если сжатие данных отдельно обрабатывается специальными средствами в другом месте, то чтобы
+// избежать двойного сжатия, ее лучше отключить, установив значение данного флага в false.
+var CompressData = true
+
+// Context содержит контекстную информацию HTTP-запроса и методы удобного формирования ответа
+// на них.
+type Context struct {
+	// параметры запроса
+	*http.Request            // HTTP запрос в разобранном виде
+	Params        Params     // именованные параметры из пути запроса
+	urlQuery      url.Values // параметры запроса
+	// параметры ответа на запрос
+	Response    http.ResponseWriter // интерфейс для публикации ответа на запрос
+	ContentType string              // тип информации в ответе
+	status      int                 // код HTTP-ответа
+}
+
+// NewContext возвращает новый инициализированный контекст. В отличии от просто создания нового
+// контекста, вызов данного метода использует пул контекстов.
+func NewContext(w http.ResponseWriter, r *http.Request, params Params) *Context {
+	context := contexts.Get().(*Context)
+
+	context.Request = r
+	context.Params = params
+	context.urlQuery = nil
+
+	context.Response = w
+	context.ContentType = ""
+	context.status = 0
+
+	return context
+}
+
+// Free возвращает контекст в пул используемых контекстов для дальнейшего использования.
+// Вызывается автоматически после того, как контекст перестает использоваться.
+func (c *Context) Free() {
+	contexts.Put(c)
+}
+
+// Get возвращает значение именованного параметра. Если параметр с таким именем не найден,
+// то возвращается значение параметра из URL с тем же именем. Разбор параметров запроса сохраняется
+// внутри Context и повторного его разбора уже не требует. Но это происходит только при первом
+// к ним обращении.
+func (c *Context) Get(key string) string {
+	for _, param := range c.Params {
+		if param.Key == key {
+			return param.Value
+		}
+	}
+	if c.urlQuery == nil {
+		c.urlQuery = c.Request.URL.Query()
+	}
+	return c.urlQuery.Get(key)
+}
+
+// Set позволяет добавить новый параметр с заданным именем и значением. Добавление нового параметра
+// с таким же именем не изменяет и не удаляет предыдущего значения, а именно добавляет его в список.
+func (c *Context) Set(key, value string) {
+	c.Params = append(c.Params, Param{key, value})
+}
+
+// Code код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает ссылку
+// на основной контекст, чтобы можно было использовать его в последовательности выполнения
+// команд. Например, можно сразу установить код ответа и тут же опубликовать данные.
+func (c *Context) Code(code int) *Context {
+	if code >= 200 && code < 600 {
+		c.status = code
+	}
+	return c
+}
+
+// SetHeader устанавливает новое значение для указанного HTTP-заголовка. Если передаваемое
+// значение заголовка пустое, то данный заголовок будет удален.
+func (c *Context) SetHeader(key, value string) {
+	if value == "" {
+		c.Response.Header().Del(key)
+	} else {
+		c.Response.Header().Set(key, value)
+	}
+}
+
+// SetLocation устанавливает в заголовке HTTP-ответа значение для Lacation.
+func (c *Context) SetLocation(value string) {
+	c.SetHeader("Location", value)
+}
+
+// ParseBody декодирует содержимое запроса в объект. После чтения из запроса
+// http.Request.Body автоматически закрывается и дополнительного закрытия не требуется.
+//
+// На данный момент поддерживается только разбор объектов в формате JSON.
+func (c *Context) ParseBody(obj interface{}) error {
+	defer c.Request.Body.Close()
+	return json.NewDecoder(c.Request.Body).Decode(obj)
+}
+
+// Body публикует данные, переданные в параметре, в качестве ответа.
+func (c *Context) Body(data interface{}) {
+	var headers = c.Response.Header() // быстрый доступ к заголовкам ответа
+	if c.ContentType == "" {
+		c.ContentType = "application/json; charset=utf-8"
+	}
+	headers.Set("Content-Type", c.ContentType)
+	// поддерживаем компрессию, если оно поддерживается клиентом и не запрещена в библиотеке
+	var writer io.Writer = c.Response
+	if CompressData {
+		switch accept := c.Request.Header.Get("Accept-Encoding"); {
+		case strings.Contains(accept, "gzip"):
+			// Поддерживается gzip-сжатие
+			headers.Set("Content-Encoding", "gzip")
+			headers.Add("Vary", "Accept-Encoding")
+			writer = gzipGet(writer)
+			defer gzipPut(writer.(io.Closer))
+		case strings.Contains(accept, "deflate"):
+			// Поддерживается deflate-сжатие
+			headers.Set("Content-Encoding", "deflate")
+			headers.Add("Vary", "Accept-Encoding")
+			writer = deflateGet(writer)
+			defer deflatePut(writer.(io.Closer))
+		}
+	}
+	// обрабатываем статус выполнения запроса
+	if c.status == 0 {
+		c.status = http.StatusOK
+	}
+	c.Response.WriteHeader(c.status)
+	// в зависимости от типа данных поддерживаются разные методы вывода
+	var err error
+	switch data := data.(type) {
+	// case nil: // нечего отдавать
+	case io.Reader: // поток данных отдаем как есть
+		_, err = io.Copy(writer, data)
+		if data, ok := data.(io.Closer); ok {
+			data.Close() // закрываем по окончании, раз поддерживается
+		}
+	case []byte: // уже готовый к отдаче набор данных
+		_, err = writer.Write(data) // тоже отдаем как есть
+	case error: // ошибки возвращаем в виде специального JSON
+		err = json.NewEncoder(writer).Encode(map[string]interface{}{
+			"code":  c.status,
+			"error": data.Error(),
+		})
+	case string: // строки тоже возвращаем в виде специального JSON
+		err = json.NewEncoder(writer).Encode(map[string]interface{}{
+			"code":    c.status,
+			"message": data,
+		})
+	default: // во всех остальных случаях сериализуем в JSON-представление
+		err = json.NewEncoder(writer).Encode(data)
+	}
+	// если возникла ошибка, то пытаемся ее вернуть
+	if err != nil {
+		// почти http.Error
+		headers.Set("Content-Type", "text/plain; charset=utf-8")
+		headers.Set("X-Content-Type-Options", "nosniff")
+		c.Response.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintln(writer, err)
+	}
+}
+
+// contexts содержит пул контекстов
+var contexts = sync.Pool{New: func() interface{} { return new(Context) }}

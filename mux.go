@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -31,14 +30,12 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 		// в роутере хранятся обработчики с привязкой к методам
 		if methods, ok := route.(Method); ok {
 			methods[method] = handler // добавляем новый обработчик пути для данного метода
-		} else {
-			panic(fmt.Errorf("bad mux definition for: %s", path))
+			return
 		}
-	} else {
-		// обработчик для данного пути не определен
-		if err := m.router.add(path, Method{method: handler}); err != nil {
-			panic(err)
-		}
+	}
+	// обработчик для данного пути не определен
+	if err := m.router.add(path, Method{method: handler}); err != nil {
+		panic(err)
 	}
 }
 
@@ -70,13 +67,12 @@ func (m *ServeMux) HandlerFunc(method, path string, handler http.HandlerFunc) {
 // параметров пути. Если обработчик для данных параметров не определен, то возвращается nil.
 func (m *ServeMux) Lookup(method, path string) (h Handler, params Params) {
 	route, params := m.router.lookup(path)
-	if route != nil {
-		// в роутере хранятся обработчики с привязкой к методам
-		if methods, ok := route.(Method); ok {
-			h = methods[strings.ToUpper(method)]
-		} else {
-			panic(fmt.Errorf("bad mux definition for: %s", path))
-		}
+	if route == nil {
+		return
+	}
+	// в роутере хранятся обработчики с привязкой к методам
+	if methods, ok := route.(Method); ok {
+		h = methods[strings.ToUpper(method)]
 	}
 	return
 }
@@ -91,9 +87,8 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	methods, ok := route.(Method) // приводим список методов
-	if !ok || len(methods) == 0 {
-		// в данном случае текст будет передан как ошибка, потому что код больше 399.
-		context.Code(http.StatusInternalServerError).Body("bad mux definition")
+	if !ok || len(methods) == 0 { // если методы не определены, то лучше вернем, что путь не найден
+		context.Code(http.StatusNotFound).Body(nil)
 		return
 	}
 	handler := methods[strings.ToUpper(req.Method)] // запрашиваем обработчик для метода

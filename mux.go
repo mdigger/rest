@@ -15,6 +15,9 @@ type Method map[string]Handler
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
 type ServeMux struct {
 	router // обработчики запросов по путям, без учета метода запроса
+	// Глобальный обработчик, вызываемый перед всеми заданными обработчиками,
+	// если определен.
+	CustomHandler func(Handler) Handler
 }
 
 // Handle добавляет новый обработчик для указанного пути и метода запроса.
@@ -103,5 +106,9 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		context.Code(http.StatusMethodNotAllowed).Body(nil)
 		return
 	}
-	handler(context) // вызываем обработчик запроса
+	if m.CustomHandler != nil { // если кастомный обработчик определен, то вызываем его
+		m.CustomHandler(handler)(context)
+	} else {
+		handler(context) // вызываем обработчик запроса
+	}
 }

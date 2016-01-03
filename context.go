@@ -18,35 +18,42 @@ var CompressData = true
 // Context содержит контекстную информацию HTTP-запроса и методы удобного формирования ответа
 // на них.
 type Context struct {
-	// параметры запроса
-	*http.Request            // HTTP запрос в разобранном виде
-	Params        Params     // именованные параметры из пути запроса
-	urlQuery      url.Values // параметры запроса
-	// параметры ответа на запрос
-	Response    http.ResponseWriter // интерфейс для публикации ответа на запрос
-	ContentType string              // тип информации в ответе
-	status      int                 // код HTTP-ответа
+	// HTTP запрос в разобранном виде
+	*http.Request
+	// именованные параметры из пути запроса
+	Params Params
+	// разобранные параметры запроса в URL (кеш)
+	urlQuery url.Values
+	// дополнительные данные, устанавливаемые пользователем
+	// в качестве ключа рекомендуется использовать приватный тип
+	// и какое-нибудь его значение, что позволит застраховаться от
+	// случайной перезаписи этих данных
+	data map[interface{}]interface{}
+	// интерфейс для публикации ответа на запрос
+	Response http.ResponseWriter
+	// тип информации в ответе
+	ContentType string
+	// код HTTP-ответа
+	status int
 }
 
-// NewContext возвращает новый инициализированный контекст. В отличии от просто создания нового
+// newContext возвращает новый инициализированный контекст. В отличии от просто создания нового
 // контекста, вызов данного метода использует пул контекстов.
-func NewContext(w http.ResponseWriter, r *http.Request, params Params) *Context {
+func newContext(w http.ResponseWriter, r *http.Request, params Params) *Context {
 	context := contexts.Get().(*Context)
-
 	context.Request = r
 	context.Params = params
 	context.urlQuery = nil
-
+	context.data = nil
 	context.Response = w
 	context.ContentType = ""
 	context.status = 0
-
 	return context
 }
 
-// Free возвращает контекст в пул используемых контекстов для дальнейшего использования.
+// free возвращает контекст в пул используемых контекстов для дальнейшего использования.
 // Вызывается автоматически после того, как контекст перестает использоваться.
-func (c *Context) Free() {
+func (c *Context) free() {
 	contexts.Put(c)
 }
 
@@ -70,6 +77,25 @@ func (c *Context) Get(key string) string {
 // с таким же именем не изменяет и не удаляет предыдущего значения, а именно добавляет его в список.
 func (c *Context) Set(key, value string) {
 	c.Params = append(c.Params, Param{key, value})
+}
+
+// GetData возвращает пользовательские данные, сохраненные в контексте запроса с указанным ключем.
+func (c *Context) GetData(key interface{}) interface{} {
+	if c.data == nil {
+		return nil
+	}
+	return c.data[key]
+}
+
+// SetData сохраняет пользовательские данные в контексте запроса с указанным ключем.
+// Рекомендуется в качестве ключа использовать какой-нибудь приватный тип и его значение,
+// чтобы избежать случайного затирания данных другими обработчиками. Это гарантированно обезопасит
+// их от случайного доступа к ним.
+func (c *Context) SetData(key, value interface{}) {
+	if c.data == nil {
+		c.data = make(map[interface{}]interface{})
+	}
+	c.data[key] = value
 }
 
 // Code код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает ссылку

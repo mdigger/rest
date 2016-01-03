@@ -5,8 +5,18 @@ import (
 	"strings"
 )
 
-// Handler является любая функция, которая принимает Context.
-type Handler func(*Context)
+// Handler описывает интерфейс обработчиков, которые могут принимать Context.
+type Handler interface {
+	ServeHTTPC(*Context) // вызывается для обработки запросов
+}
+
+// HandlerFunc является любая функция, которая принимает Context.
+type HandlerFunc func(*Context)
+
+// ServeHTTPC поддерживает интерфейс Handler для упрощенных функций обработки.
+func (f HandlerFunc) ServeHTTPC(c *Context) {
+	f(c)
+}
 
 // Method описывает список Handle, ассоциированные с HTTP-методами.
 type Method map[string]Handler
@@ -37,6 +47,10 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	m.Handles(path, Method{method: handler})
 }
 
+// func (m *ServeMux) HandleFunc(method, path string, handler HandlerFunc) {
+// 	m.Handle(method, path, handler)
+// }
+
 // Handles добавляет определение обработчиков сразу для всех методов для указанного пути.
 func (m *ServeMux) Handles(path string, handlers Method) {
 	if len(handlers) == 0 {
@@ -49,16 +63,16 @@ func (m *ServeMux) Handles(path string, handlers Method) {
 
 // Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
 func (m *ServeMux) Handler(method, path string, handler http.Handler) {
-	m.Handle(method, path, func(c *Context) {
+	m.Handle(method, path, HandlerFunc(func(c *Context) {
 		handler.ServeHTTP(c.Response, c.Request)
-	})
+	}))
 }
 
 // HandlerFunc позволяет привязать к нашему описанию стандартный обработчик http.Handler.
 func (m *ServeMux) HandlerFunc(method, path string, handler http.HandlerFunc) {
-	m.Handle(method, path, func(c *Context) {
+	m.Handle(method, path, HandlerFunc(func(c *Context) {
 		handler(c.Response, c.Request)
-	})
+	}))
 }
 
 // Lookup возвращает обработчик для указанного пути и метода, а так же заполненный список
@@ -75,10 +89,11 @@ func (m *ServeMux) Lookup(method, path string) (h Handler, params Params) {
 	return
 }
 
-// ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
-func (m *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	route, params := m.router.lookup(req.URL.Path) // получаем обработчик для указанного пути
-	context := newContext(w, req, params)          // формируем контекст для ответа
+// ServeHTTPC поддерживает интерфейс Handler и отвечает за основную обработку запроса.
+func (m *ServeMux) ServeHTTPC(context *Context) {
+	// получаем обработчик для указанного пути
+	route, params := m.router.lookup(context.Request.URL.Path)
+	context.Params = append(context.Params, params...)
 	if route == nil {
 		// при статусе больше 399 пустой body формирует JSON с описанием ошибки автоматически
 		context.Code(http.StatusNotFound).Body(nil)
@@ -89,8 +104,8 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		context.Code(http.StatusNotFound).Body(nil)
 		return
 	}
-	handler := methods[strings.ToUpper(req.Method)] // запрашиваем обработчик для метода
-	if handler == nil {                             // обработчик для данного метода не определен
+	handler := methods[strings.ToUpper(context.Request.Method)] // запрашиваем обработчик для метода
+	if handler == nil {                                         // обработчик для данного метода не определен
 		allows := make([]string, 0, len(methods)) // формируем список поддерживаемых методов
 		for method := range methods {
 			allows = append(allows, method)
@@ -100,8 +115,13 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if m.CustomHandler != nil { // если кастомный обработчик определен, то вызываем его
-		m.CustomHandler(handler)(context)
+		m.CustomHandler(handler).ServeHTTPC(context)
 	} else {
-		handler(context) // вызываем обработчик запроса
+		handler.ServeHTTPC(context) // вызываем обработчик запроса
 	}
+}
+
+// ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
+func (m *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	m.ServeHTTPC(newContext(w, req, nil)) // формируем контекст для ответа
 }

@@ -34,9 +34,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 		}
 	}
 	// обработчик для данного пути не определен
-	if err := m.router.add(path, Method{method: handler}); err != nil {
-		panic(err)
-	}
+	m.Handles(path, Method{method: handler})
 }
 
 // Handles добавляет определение обработчиков сразу для всех методов для указанного пути.

@@ -47,9 +47,9 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	m.Handles(path, Method{method: handler})
 }
 
-// func (m *ServeMux) HandleFunc(method, path string, handler HandlerFunc) {
-// 	m.Handle(method, path, handler)
-// }
+func (m *ServeMux) HandleFunc(method, path string, handler func(*Context)) {
+	m.Handle(method, path, HandlerFunc(handler))
+}
 
 // Handles добавляет определение обработчиков сразу для всех методов для указанного пути.
 func (m *ServeMux) Handles(path string, handlers Method) {

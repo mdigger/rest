@@ -23,6 +23,7 @@ func TestHandler(t *testing.T) {
 		},
 	}
 	mux.Handles(handlers)
+	mux.BasePath = "/api/v1"
 	ts := httptest.NewTLSServer(mux)
 	defer ts.Close()
 
@@ -33,7 +34,7 @@ func TestHandler(t *testing.T) {
 			},
 		},
 	}
-	res, err := client.Get(ts.URL + "/login")
+	res, err := client.Get(ts.URL + mux.BasePath + "/login")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,7 +43,7 @@ func TestHandler(t *testing.T) {
 
 	fmt.Println(strings.Repeat("-", 40))
 
-	res, err = client.Post(ts.URL+"/login", "", nil)
+	res, err = client.Post(ts.URL+mux.BasePath+"/login", "", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func TestHandler(t *testing.T) {
 
 	fmt.Println(strings.Repeat("-", 40))
 
-	res, err = client.Get(ts.URL + "/login/dmitrys")
+	res, err = client.Get(ts.URL + mux.BasePath + "/login/dmitrys")
 	if err != nil {
 		log.Fatal(err)
 	}

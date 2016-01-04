@@ -24,12 +24,19 @@ type Methods map[string]Handler
 // метода ServeMux.Handles.
 type Handlers map[string]Methods
 
+// Middleware описывает вспомогательные обработчики, которые могут использоваться
+// в качестве конвейера обработки запросов.
+type Middleware func(Handler) Handler
+
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
 type ServeMux struct {
+	// позволяет задать базовый путь для всех запросов
+	// данный путь "отрезается" и не используется при вычислении обработчика
+	BasePath string
 	// Глобальный обработчик, вызываемый перед всеми заданными обработчиками,
 	// если определен.
-	CustomHandler func(Handler) Handler
-	router        // обработчики запросов по путям, без учета метода запроса
+	Middleware
+	router // обработчики запросов по путям, без учета метода запроса
 }
 
 // Handles добавляет определение обработчиков сразу для всех методов для указанного пути, что
@@ -71,6 +78,15 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 
 // ServeHTTPC поддерживает интерфейс Handler и отвечает за основную обработку запроса.
 func (m ServeMux) ServeHTTPC(context *Context) {
+	// если установлен базовый путь, то отрезаем его
+	if m.BasePath != "" {
+		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)
+		if len(p) == len(context.Request.URL.Path) {
+			context.Code(http.StatusNotFound).Body(nil)
+			return
+		}
+		context.Request.URL.Path = p
+	}
 	// получаем обработчик для указанного пути
 	route, params := m.router.lookup(context.Request.URL.Path)
 	context.Params = append(context.Params, params...)
@@ -94,11 +110,10 @@ func (m ServeMux) ServeHTTPC(context *Context) {
 		context.Code(http.StatusMethodNotAllowed).Body(nil)
 		return
 	}
-	if m.CustomHandler != nil { // если кастомный обработчик определен, то вызываем его
-		m.CustomHandler(handler).ServeHTTPC(context)
-	} else {
-		handler.ServeHTTPC(context) // вызываем обработчик запроса
+	if m.Middleware != nil { // если промежуточный обработчик определен, то вызываем его
+		handler = m.Middleware(handler)
 	}
+	handler.ServeHTTPC(context) // вызываем обработчик запроса
 }
 
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.

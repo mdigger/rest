@@ -29,6 +29,11 @@ type Paths map[string]Methods
 type Middleware func(Handler) Handler
 
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
+//
+// Внутри используется достаточно простой и быстрый алгоритм выбора обработчиков, основанный
+// на количестве элементов пути (между разделителями '/'). К сожалению, данный алгоритм не
+// позволяет использовать catch-all параметры и позволяет использовать вложенные мультиплексоры:
+// они просто не будут корректно работать.
 type ServeMux struct {
 	// позволяет задать базовый путь для всех запросов
 	// данный путь "отрезается" и не используется при вычислении обработчика
@@ -76,8 +81,8 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 	}))
 }
 
-// ServeHTTPC поддерживает интерфейс Handler и отвечает за основную обработку запроса.
-func (m ServeMux) ServeHTTPC(context *Context) {
+// serveHTTPC поддерживает интерфейс Handler и отвечает за основную обработку запроса.
+func (m ServeMux) serveHTTPC(context *Context) {
 	// если установлен базовый путь, то отрезаем его
 	if m.BasePath != "" {
 		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)
@@ -118,5 +123,5 @@ func (m ServeMux) ServeHTTPC(context *Context) {
 
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
 func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	m.ServeHTTPC(newContext(w, req, nil)) // формируем контекст для ответа
+	m.serveHTTPC(newContext(w, req, nil)) // формируем контекст для ответа
 }

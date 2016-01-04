@@ -13,7 +13,7 @@ var c = new(rest.Context) // test context
 func ExampleContext_DataSet() {
 	type myKeyType byte     // определяем собственный тип данных
 	var myKey myKeyType = 1 // генерируем уникальный ключ данных
-	// сохраням данные в контексте, используя уникальный ключ
+	// сохраняем данные в контексте, используя уникальный ключ
 	c.DataSet(myKey, "Test data")
 	// читаем данные с помощью ключа
 	str := c.DataGet(myKey).(string)
@@ -52,9 +52,10 @@ func ExampleContext_ParseBody() {
 
 func ExampleContext_SetHeader() {
 	c.SetHeader("ETag", "ab0138")
+	c.SetHeader("Location", "/user/43952945")
 }
 
-func ExampleHandlers() {
+func ExampleServeMux_Handles() {
 	var mux rest.ServeMux
 	// определяем обработчики для всех наших запросов сразу
 	mux.Handles(rest.Handlers{

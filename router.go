@@ -63,7 +63,7 @@ func (r *router) add(url string, handle interface{}) error {
 	}
 	var dynamic uint8 // считаем количество параметров
 	for _, value := range parts {
-		if len(value) > 0 && value[0] == ParamFlag {
+		if len(value) > 0 && value[0] == paramFlag {
 			dynamic++ // увеличиваем счетчик параметров
 		}
 	}
@@ -95,7 +95,7 @@ func (r *router) add(url string, handle interface{}) error {
 
 // lookup возвращает обработчик и список именованных параметров с их значениям. Символ параметра
 // из имени при этом изымается. Если подходящего обработчика не найдено, то возвращается nil.
-func (r *router) lookup(url string) (interface{}, Params) {
+func (r *router) lookup(url string) (interface{}, []Param) {
 	parts := split(url) // нормализуем путь и разбиваем его на части
 	// сначала ищем среди статических путей
 	if r.static != nil { // если статические пути не определены, то пропускаем проверку
@@ -113,9 +113,9 @@ func (r *router) lookup(url string) (interface{}, Params) {
 	}
 next:
 	for _, record := range records { // перебираем все записи с обработчиками
-		var params Params                   // сбрасываем предыдущие значения, если они были
+		var params []Param                  // сбрасываем предыдущие значения, если они были
 		for i, part := range record.parts { // перебираем все части пути, заданные в обработчике
-			if len(part) > 0 && part[0] == ParamFlag { // это параметр
+			if len(part) > 0 && part[0] == paramFlag { // это параметр
 				// добавляем в список именованных параметров его имя и значение
 				// из имени убираем символ параметра
 				params = append(params, Param{Key: part[1:], Value: parts[i]})

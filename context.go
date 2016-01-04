@@ -21,7 +21,7 @@ type Context struct {
 	// HTTP запрос в разобранном виде
 	*http.Request
 	// именованные параметры из пути запроса
-	Params Params
+	Params []Param
 	// интерфейс для публикации ответа на запрос
 	Response http.ResponseWriter
 	// тип информации в ответе
@@ -39,7 +39,7 @@ type Context struct {
 
 // newContext возвращает новый инициализированный контекст. В отличии от просто создания нового
 // контекста, вызов данного метода использует пул контекстов.
-func newContext(w http.ResponseWriter, r *http.Request, params Params) *Context {
+func newContext(w http.ResponseWriter, r *http.Request, params []Param) *Context {
 	context := contexts.Get().(*Context)
 	context.Request = r
 	context.Params = params

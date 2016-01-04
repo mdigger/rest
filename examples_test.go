@@ -60,7 +60,7 @@ func Example() {
 	http.ListenAndServe(":8080", mux)
 }
 
-func ExampleContext_DataSet() {
+func ExampleContext_SetData() {
 	type myKeyType byte     // определяем собственный тип данных
 	var myKey myKeyType = 1 // генерируем уникальный ключ данных
 	// сохраняем данные в контексте, используя уникальный ключ
@@ -71,7 +71,7 @@ func ExampleContext_DataSet() {
 	// Output: Test data
 }
 
-func ExampleContext_Body() {
+func ExampleContext_Send() {
 	// открываем файл
 	file, err := os.Open("README.md")
 	if err != nil {
@@ -87,7 +87,7 @@ func ExampleContext_Body() {
 	file.Close()
 }
 
-func ExampleContext_Code() {
+func ExampleContext_Status() {
 	// возвращаем 404 ошибку
 	c.Status(404).Send(nil)
 }

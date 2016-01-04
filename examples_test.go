@@ -10,6 +10,30 @@ import (
 
 var c = new(rest.Context) // test context
 
+func Example() {
+	var mux rest.ServeMux
+	mux.Handles(rest.Handlers{
+		"/user/:id": {
+			"GET": rest.HandlerFunc(func(c *rest.Context) {
+				c.Body(rest.JSON{"user": c.Get("id")})
+			}),
+			"POST": rest.HandlerFunc(func(c *rest.Context) {
+				var data = make(rest.JSON)
+				if err := c.Parse(&data); err != nil {
+					c.Code(500).Body(err)
+					return
+				}
+				c.Body(rest.JSON{"user": c.Get("id"), "data": data})
+			}),
+		},
+		"/message/:text": {
+			"GET": rest.HandlerFunc(func(c *rest.Context) {
+				c.Body(rest.JSON{"message": c.Get("text")})
+			}),
+		},
+	})
+}
+
 func ExampleContext_DataSet() {
 	type myKeyType byte     // определяем собственный тип данных
 	var myKey myKeyType = 1 // генерируем уникальный ключ данных
@@ -53,31 +77,6 @@ func ExampleContext_Parse() {
 func ExampleContext_SetHeader() {
 	c.SetHeader("ETag", "ab0138")
 	c.SetHeader("Location", "/user/43952945")
-}
-
-func ExampleServeMux_Handles() {
-	var mux rest.ServeMux
-	// определяем обработчики для всех наших запросов сразу
-	mux.Handles(rest.Handlers{
-		"/user/:id": {
-			"GET": rest.HandlerFunc(func(c *rest.Context) {
-				c.Body(rest.JSON{"user": c.Get("id")})
-			}),
-			"POST": rest.HandlerFunc(func(c *rest.Context) {
-				var data = make(rest.JSON)
-				if err := c.Parse(&data); err != nil {
-					c.Code(500).Body(err)
-					return
-				}
-				c.Body(rest.JSON{"user": c.Get("id"), "data": data})
-			}),
-		},
-		"/message/:text": {
-			"GET": rest.HandlerFunc(func(c *rest.Context) {
-				c.Body(rest.JSON{"message": c.Get("text")})
-			}),
-		},
-	})
 }
 
 func ExampleServeMux_Handle() {

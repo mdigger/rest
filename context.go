@@ -95,10 +95,10 @@ func (c *Context) DataSet(key, value interface{}) {
 	c.data[key] = value
 }
 
-// Code устанавливает код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает
+// Status устанавливает код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает
 // ссылку на основной контекст, чтобы можно было использовать его в последовательности выполнения
 // команд. Например, можно сразу установить код ответа и тут же опубликовать данные.
-func (c *Context) Code(code int) *Context {
+func (c *Context) Status(code int) *Context {
 	if code >= 200 && code < 600 {
 		c.status = code
 	}
@@ -124,7 +124,7 @@ func (c *Context) Parse(obj interface{}) error {
 	return json.NewDecoder(c.Request.Body).Decode(obj)
 }
 
-// Body публикует данные, переданные в параметре, в качестве ответа. Если ContentType не указан,
+// Send публикует данные, переданные в параметре, в качестве ответа. Если ContentType не указан,
 // то используется "application/json".
 //
 // В зависимости от типа передаваемых данных, ответ формируется по разному.
@@ -139,7 +139,7 @@ func (c *Context) Parse(obj interface{}) error {
 // Вызов данного метода сразу инициализирует отдачу содержимого в качестве ответа. Поэтому не
 // рекомендуется вызывать его несколько раз, т.к. попытка второй раз вернуть статус ответа
 // приведет к ошибке.
-func (c *Context) Body(data interface{}) (err error) {
+func (c *Context) Send(data interface{}) (err error) {
 	defer func() {
 		if recover := recover(); recover != nil {
 			var ok bool

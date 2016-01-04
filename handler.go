@@ -16,13 +16,13 @@ type HandlerFunc func(*Context)
 // ServeHTTPC поддерживает интерфейс Handler для упрощенных функций обработки.
 func (f HandlerFunc) ServeHTTPC(c *Context) { f(c) }
 
-// Method описывает список Handler, ассоциированные с HTTP-методами.
-type Method map[string]Handler
+// Methods описывает список Handler, ассоциированные с HTTP-методами.
+type Methods map[string]Handler
 
 // Handlers позволяет описать сразу несколько обработчиков для разных путей и методов: ключем для
 // данного словаря как раз являются пути запросов. Используется в качестве аргумента при вызове
 // метода ServeMux.Handles.
-type Handlers map[string]Method
+type Handlers map[string]Methods
 
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
 type ServeMux struct {
@@ -53,13 +53,13 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	// предполагаем, что обработчик для данного пути уже есть
 	if route, _ := m.router.lookup(path); route != nil {
 		// в роутере хранятся обработчики с привязкой к методам
-		if methods, ok := route.(Method); ok {
+		if methods, ok := route.(Methods); ok {
 			methods[method] = handler // добавляем новый обработчик пути для данного метода
 			return
 		}
 	}
 	// обработчик для данного пути не определен
-	m.Handles(Handlers{path: Method{method: handler}})
+	m.Handles(Handlers{path: Methods{method: handler}})
 }
 
 // Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
@@ -79,8 +79,8 @@ func (m ServeMux) ServeHTTPC(context *Context) {
 		context.Code(http.StatusNotFound).Body(nil)
 		return
 	}
-	methods, ok := route.(Method) // приводим список методов
-	if !ok || len(methods) == 0 { // если методы не определены, то лучше вернем, что путь не найден
+	methods, ok := route.(Methods) // приводим список методов
+	if !ok || len(methods) == 0 {  // если методы не определены, то лучше вернем, что путь не найден
 		context.Code(http.StatusNotFound).Body(nil)
 		return
 	}

@@ -9,10 +9,6 @@ import (
 // Handler является любая функция, которая принимает Context.
 type Handler func(*Context)
 
-// Middleware описывает вспомогательные обработчики, которые могут использоваться
-// в качестве конвейера обработки запросов.
-type Middleware func(Handler) Handler
-
 // Methods описывает список Handler, ассоциированные с HTTP-методами.
 type Methods map[string]Handler
 
@@ -37,8 +33,8 @@ type ServeMux struct {
 	BasePath string
 	// Глобальный обработчик, вызываемый перед всеми заданными обработчиками,
 	// если определен.
-	Middleware
-	router // обработчики запросов по путям, без учета метода запроса
+	Middleware func(Handler) Handler
+	router     // обработчики запросов по путям, без учета метода запроса
 }
 
 // Handles добавляет определение обработчиков сразу для всех методов для указанного пути, что

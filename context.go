@@ -22,6 +22,12 @@ type Context struct {
 	*http.Request
 	// именованные параметры из пути запроса
 	Params Params
+	// интерфейс для публикации ответа на запрос
+	Response http.ResponseWriter
+	// тип информации в ответе
+	ContentType string
+	// код HTTP-ответа
+	status int
 	// разобранные параметры запроса в URL (кеш)
 	urlQuery url.Values
 	// дополнительные данные, устанавливаемые пользователем
@@ -29,12 +35,6 @@ type Context struct {
 	// и какое-нибудь его значение, что позволит застраховаться от
 	// случайной перезаписи этих данных
 	data map[interface{}]interface{}
-	// интерфейс для публикации ответа на запрос
-	Response http.ResponseWriter
-	// тип информации в ответе
-	ContentType string
-	// код HTTP-ответа
-	status int
 }
 
 // newContext возвращает новый инициализированный контекст. В отличии от просто создания нового

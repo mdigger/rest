@@ -10,11 +10,11 @@ type Handler interface {
 	ServeHTTPC(*Context) // вызывается для обработки запросов
 }
 
-// HandlerFunc является любая функция, которая принимает Context.
-type HandlerFunc func(*Context)
+// Func является любая функция, которая принимает Context.
+type Func func(*Context)
 
 // ServeHTTPC поддерживает интерфейс Handler для упрощенных функций обработки.
-func (f HandlerFunc) ServeHTTPC(c *Context) { f(c) }
+func (f Func) ServeHTTPC(c *Context) { f(c) }
 
 // Methods описывает список Handler, ассоциированные с HTTP-методами.
 type Methods map[string]Handler
@@ -64,7 +64,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 
 // Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
 func (m *ServeMux) Handler(method, path string, handler http.Handler) {
-	m.Handle(method, path, HandlerFunc(func(c *Context) {
+	m.Handle(method, path, Func(func(c *Context) {
 		handler.ServeHTTP(c.Response, c.Request)
 	}))
 }

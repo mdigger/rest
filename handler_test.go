@@ -13,21 +13,16 @@ import (
 
 func TestHandler(t *testing.T) {
 	var mux ServeMux
-	mux.Handles(Handlers{
-		"/login": Method{
-			"GET": HandlerFunc(func(c *Context) {
-				c.Body("login GET")
-			}),
-			"POST": HandlerFunc(func(c *Context) {
-				c.Body("login POST")
-			}),
+	handlers := Handlers{
+		"/login": {
+			"GET":  HandlerFunc(func(c *Context) { c.Body("login GET") }),
+			"POST": HandlerFunc(func(c *Context) { c.Body("login POST") }),
 		},
-		"/login/:user-id": Method{
-			"GET": HandlerFunc(func(c *Context) {
-				c.Body(map[string]string{"user": c.Get("user-id")})
-			}),
+		"/login/:user-id": {
+			"GET": HandlerFunc(func(c *Context) { c.Body(M{"user": c.Get("user-id")}) }),
 		},
-	})
+	}
+	mux.Handles(handlers)
 	ts := httptest.NewTLSServer(mux)
 	defer ts.Close()
 

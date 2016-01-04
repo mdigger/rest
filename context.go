@@ -10,6 +10,9 @@ import (
 	"sync"
 )
 
+// M является вспомогательным типом для быстрого создания JSON-структур.
+type M map[string]interface{}
+
 // CompressData разрешает поддержку сжатия данных, если это поддерживается браузером.
 // Если сжатие данных отдельно обрабатывается специальными средствами в другом месте, то чтобы
 // избежать двойного сжатия, ее лучше отключить, установив значение данного флага в false.
@@ -132,12 +135,14 @@ func (c *Context) ParseBody(obj interface{}) error {
 	return json.NewDecoder(c.Request.Body).Decode(obj)
 }
 
-// Body публикует данные, переданные в параметре, в качестве ответа.
+// Body публикует данные, переданные в параметре, в качестве ответа. Если ContentType не указан,
+// то используется "application/json".
 //
 // В зависимости от типа передаваемых данных, ответ формируется по разному.
 // Если данные являются бинарными ([]byte) или поддерживают интерфейс io.Reader, то данные отдаются
-// как есть, без какого-либо изменения. Строки и ошибки преобразуются в простое JSON-сообщение,
-// состоящие из кода статуса и текста сообщения. Остальные типы приводятся к формату JSON.
+// как есть, без какого-либо изменения. Если io.Reader поддерживает io.Close, то он будет
+// автоматически закрыт. Строки и ошибки преобразуются в простое JSON-сообщение, состоящие из кода
+// статуса и текста сообщения. Остальные типы приводятся к формату JSON.
 //
 // Если клиент поддерживает сжатие при передаче данных, то автоматически включается поддержка
 // сжатия ответа. Чтобы отключить данное поведение, необходимо установить флаг CompressData в false.
@@ -147,18 +152,16 @@ func (c *Context) Body(data interface{}) {
 		c.ContentType = "application/json; charset=utf-8"
 	}
 	headers.Set("Content-Type", c.ContentType)
-	// поддерживаем компрессию, если оно поддерживается клиентом и не запрещена в библиотеке
+	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
 	var writer io.Writer = c.Response
 	if CompressData {
 		switch accept := c.Request.Header.Get("Accept-Encoding"); {
-		case strings.Contains(accept, "gzip"):
-			// Поддерживается gzip-сжатие
+		case strings.Contains(accept, "gzip"): // Поддерживается gzip-сжатие
 			headers.Set("Content-Encoding", "gzip")
 			headers.Add("Vary", "Accept-Encoding")
 			writer = gzipGet(writer)
 			defer gzipPut(writer.(io.Closer))
-		case strings.Contains(accept, "deflate"):
-			// Поддерживается deflate-сжатие
+		case strings.Contains(accept, "deflate"): // Поддерживается deflate-сжатие
 			headers.Set("Content-Encoding", "deflate")
 			headers.Add("Vary", "Accept-Encoding")
 			writer = deflateGet(writer)
@@ -169,17 +172,14 @@ func (c *Context) Body(data interface{}) {
 	if c.status == 0 {
 		c.status = http.StatusOK
 	}
-	c.Response.WriteHeader(c.status)
-	enc := json.NewEncoder(writer)
+	c.Response.WriteHeader(c.status) // отдаем статус ответа
+	enc := json.NewEncoder(writer)   // инициализируем JSON-encoder
 	// в зависимости от типа данных поддерживаются разные методы вывода
 	var err error
 	switch data := data.(type) {
 	case nil: // нечего отдавать
 		if c.status >= 400 { // если статус соответствует ошибке, то формируем текст с ее описанием
-			err = enc.Encode(map[string]interface{}{
-				"code":  c.status,
-				"error": http.StatusText(c.status),
-			})
+			err = enc.Encode(M{"code": c.status, "error": http.StatusText(c.status)})
 		}
 	case io.Reader: // поток данных отдаем как есть
 		_, err = io.Copy(writer, data)
@@ -189,19 +189,16 @@ func (c *Context) Body(data interface{}) {
 	case []byte: // уже готовый к отдаче набор данных
 		_, err = writer.Write(data) // тоже отдаем как есть
 	case error: // ошибки возвращаем в виде специального JSON
-		err = enc.Encode(map[string]interface{}{
-			"code":  c.status,
-			"error": data.Error(),
-		})
+		err = enc.Encode(M{"code": c.status, "error": data.Error()})
 	case string: // строки тоже возвращаем в виде специального JSON
-		m := map[string]interface{}{"code": c.status}
-		if c.status >= 400 {
+		m := M{"code": c.status}
+		if c.status >= 400 { // в случае ошибок это будет error
 			m["error"] = data
-		} else {
+		} else { // с случае просто текстовых сообщений — message
 			m["message"] = data
 		}
 		err = enc.Encode(m)
-	default: // во всех остальных случаях сериализуем в JSON-представление
+	default: // во всех остальных случаях отдаем JSON-представление
 		err = enc.Encode(data)
 	}
 	// если возникла ошибка, то пытаемся ее вернуть

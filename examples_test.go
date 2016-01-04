@@ -11,30 +11,40 @@ import (
 var c = new(rest.Context) // test context
 
 func ExampleContext_DataSet() {
-	type myType byte
-	var myData myType = 1
-
-	c.DataSet(myData, "Test data")
-	str := c.DataGet(myData).(string)
+	type myKeyType byte     // определяем собственный тип данных
+	var myKey myKeyType = 1 // генерируем уникальный ключ данных
+	// сохраням данные в контексте, используя уникальный ключ
+	c.DataSet(myKey, "Test data")
+	// читаем данные с помощью ключа
+	str := c.DataGet(myKey).(string)
 	fmt.Println(str)
 	// Output: Test data
 }
 
 func ExampleContext_Body() {
+	// открываем файл
 	file, err := os.Open("README.md")
 	if err != nil {
 		panic(err)
 	}
+	// устанавливаем тип отдаваемых данных
 	c.ContentType = "text/markdown; charset=UTF-8"
-	c.Body(file) // отдаст содержимое файла
+	// отдаем содержимое файла в качестве ответа
+	c.Body(file)
+	// закрытие файла не обязательно, т.к. метод Body автоматически
+	// закроет его, если поддерживается интрефейс io.ReadCloser
+	file.Close()
 }
 
 func ExampleContext_Code() {
+	// возвращаем 404 ошибку
 	c.Code(404).Body(nil)
 }
 
 func ExampleContext_ParseBody() {
+	// инициализируем формат данных для разбора
 	obj := make(map[string]interface{})
+	// читаем запрос и получаем данные в разобранном виде
 	if err := c.ParseBody(&obj); err != nil {
 		panic(err)
 	}
@@ -46,6 +56,7 @@ func ExampleContext_SetHeader() {
 
 func ExampleHandlers() {
 	var mux rest.ServeMux
+	// определяем обработчики для всех наших запросов сразу
 	mux.Handles(rest.Handlers{
 		"/user/:id": {
 			"GET": rest.HandlerFunc(func(c *rest.Context) {
@@ -80,6 +91,7 @@ func ExampleServeMux_Handle() {
 
 func ExampleServeMux_Handler() {
 	var mux rest.ServeMux
+	// в качестве обработчиков можно использовать стандартные обработчики http
 	mux.Handler("GET", "/tmpfiles/",
 		http.StripPrefix("/tmpfiles/", http.FileServer(http.Dir("/tmp"))))
 }
@@ -89,5 +101,7 @@ func ExampleServeMux_ServeHTTP() {
 	mux.Handle("GET", "/message/:text", rest.HandlerFunc(func(c *rest.Context) {
 		c.Body(rest.JSON{"message": c.Get("text")})
 	}))
+	// т.к. поддерживается интерфейс http.Handler, то можно использовать
+	// с любыми стандартными библиотеками
 	http.ListenAndServe(":8080", mux)
 }

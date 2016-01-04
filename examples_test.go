@@ -12,7 +12,7 @@ var c = new(rest.Context) // test context
 
 func Example() {
 	var mux rest.ServeMux
-	mux.Handles(rest.Handlers{
+	mux.Handles(rest.Paths{
 		"/user/:id": {
 			"GET": rest.Func(func(c *rest.Context) {
 				c.Body(rest.JSON{"user": c.Get("id")})

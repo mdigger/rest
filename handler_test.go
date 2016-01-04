@@ -13,7 +13,7 @@ import (
 
 func TestHandler(t *testing.T) {
 	var mux ServeMux
-	handlers := Handlers{
+	handlers := Paths{
 		"/login": {
 			"GET":  Func(func(c *Context) { c.Body("login GET") }),
 			"POST": Func(func(c *Context) { c.Body("login POST") }),

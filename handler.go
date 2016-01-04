@@ -19,10 +19,10 @@ func (f Func) ServeHTTPC(c *Context) { f(c) }
 // Methods описывает список Handler, ассоциированные с HTTP-методами.
 type Methods map[string]Handler
 
-// Handlers позволяет описать сразу несколько обработчиков для разных путей и методов: ключем для
+// Paths позволяет описать сразу несколько обработчиков для разных путей и методов: ключем для
 // данного словаря как раз являются пути запросов. Используется в качестве аргумента при вызове
 // метода ServeMux.Handles.
-type Handlers map[string]Methods
+type Paths map[string]Methods
 
 // Middleware описывает вспомогательные обработчики, которые могут использоваться
 // в качестве конвейера обработки запросов.
@@ -41,7 +41,7 @@ type ServeMux struct {
 
 // Handles добавляет определение обработчиков сразу для всех методов для указанного пути, что
 // иногда является достаточно удобным вариантом.
-func (m *ServeMux) Handles(handlers Handlers) {
+func (m *ServeMux) Handles(handlers Paths) {
 	for path, methods := range handlers {
 		if len(methods) > 0 {
 			if err := m.router.add(path, methods); err != nil {
@@ -66,7 +66,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 		}
 	}
 	// обработчик для данного пути не определен
-	m.Handles(Handlers{path: Methods{method: handler}})
+	m.Handles(Paths{path: Methods{method: handler}})
 }
 
 // Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.

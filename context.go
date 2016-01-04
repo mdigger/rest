@@ -121,11 +121,6 @@ func (c *Context) SetHeader(key, value string) {
 	}
 }
 
-// SetLocation устанавливает в заголовке HTTP-ответа значение для Lacation.
-func (c *Context) SetLocation(value string) {
-	c.SetHeader("Location", value)
-}
-
 // ParseBody декодирует содержимое запроса в объект. После чтения из запроса
 // http.Request.Body автоматически закрывается и дополнительного закрытия не требуется.
 //

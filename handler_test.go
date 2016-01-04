@@ -19,7 +19,7 @@ func TestHandler(t *testing.T) {
 			"POST": HandlerFunc(func(c *Context) { c.Body("login POST") }),
 		},
 		"/login/:user-id": {
-			"GET": HandlerFunc(func(c *Context) { c.Body(M{"user": c.Get("user-id")}) }),
+			"GET": HandlerFunc(func(c *Context) { c.Body(JSON{"user": c.Get("user-id")}) }),
 		},
 	}
 	mux.Handles(handlers)

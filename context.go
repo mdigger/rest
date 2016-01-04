@@ -10,8 +10,8 @@ import (
 	"sync"
 )
 
-// M является вспомогательным типом для быстрого создания JSON-структур.
-type M map[string]interface{}
+// JSON является вспомогательным типом для быстрого создания JSON-структур.
+type JSON map[string]interface{}
 
 // CompressData разрешает поддержку сжатия данных, если это поддерживается браузером.
 // Если сжатие данных уже поддерживается, например, на уровне вашего обработчика, то вы можете
@@ -101,8 +101,8 @@ func (c *Context) DataSet(key, value interface{}) {
 	c.data[key] = value
 }
 
-// Code код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает ссылку
-// на основной контекст, чтобы можно было использовать его в последовательности выполнения
+// Code устанавливает код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает
+// ссылку на основной контекст, чтобы можно было использовать его в последовательности выполнения
 // команд. Например, можно сразу установить код ответа и тут же опубликовать данные.
 func (c *Context) Code(code int) *Context {
 	if code >= 200 && code < 600 {
@@ -179,7 +179,7 @@ func (c *Context) Body(data interface{}) {
 	switch data := data.(type) {
 	case nil: // нечего отдавать
 		if c.status >= 400 { // если статус соответствует ошибке, то формируем текст с ее описанием
-			err = enc.Encode(M{"code": c.status, "error": http.StatusText(c.status)})
+			err = enc.Encode(JSON{"code": c.status, "error": http.StatusText(c.status)})
 		}
 	case io.Reader: // поток данных отдаем как есть
 		_, err = io.Copy(writer, data)
@@ -189,9 +189,9 @@ func (c *Context) Body(data interface{}) {
 	case []byte: // уже готовый к отдаче набор данных
 		_, err = writer.Write(data) // тоже отдаем как есть
 	case error: // ошибки возвращаем в виде специального JSON
-		err = enc.Encode(M{"code": c.status, "error": data.Error()})
+		err = enc.Encode(JSON{"code": c.status, "error": data.Error()})
 	case string: // строки тоже возвращаем в виде специального JSON
-		m := M{"code": c.status}
+		m := JSON{"code": c.status}
 		if c.status >= 400 { // в случае ошибок это будет error
 			m["error"] = data
 		} else { // с случае просто текстовых сообщений — message

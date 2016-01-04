@@ -69,10 +69,7 @@ func ExampleServeMux_Handles() {
 					c.Code(500).Body(err)
 					return
 				}
-				c.Body(rest.JSON{
-					"user": c.Get("id"),
-					"data": data,
-				})
+				c.Body(rest.JSON{"user": c.Get("id"), "data": data})
 			}),
 		},
 		"/message/:text": {

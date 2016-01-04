@@ -10,7 +10,7 @@ import (
 
 var c = new(rest.Context) // test context
 
-func ExampleContex_DataSet() {
+func ExampleContext_DataSet() {
 	type myType byte
 	var myData myType = 1
 

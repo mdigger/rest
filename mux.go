@@ -21,10 +21,10 @@ type Method map[string]Handler
 
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
 type ServeMux struct {
-	router // обработчики запросов по путям, без учета метода запроса
 	// Глобальный обработчик, вызываемый перед всеми заданными обработчиками,
 	// если определен.
 	CustomHandler func(Handler) Handler
+	router        // обработчики запросов по путям, без учета метода запроса
 }
 
 // Handle добавляет новый обработчик для указанного пути и метода запроса.
@@ -45,6 +45,8 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	m.Handles(path, Method{method: handler})
 }
 
+// HandleFunc позволяет использовать в качестве обработчика функцию, принимающую контекст в
+// качестве аргумента.
 func (m *ServeMux) HandleFunc(method, path string, handler func(*Context)) {
 	m.Handle(method, path, HandlerFunc(handler))
 }

@@ -128,14 +128,15 @@ func ExampleServeMux_Handles() {
 			"POST": user.post,
 		},
 		"/message/:text": {"GET": getMessage},
-		"/file/:name":    {"GET": getFile},
+		"/file/:name":    {"GET": secure(getFile)},
 	})
 }
 
 type User struct{}
 
-func (User) get(*rest.Context)  {}
-func (User) post(*rest.Context) {}
+func (User) get(*rest.Context)           {}
+func (User) post(*rest.Context)          {}
+func secure(h rest.Handler) rest.Handler { return h }
 
 var (
 	user       User

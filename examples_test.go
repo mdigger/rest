@@ -14,7 +14,7 @@ func Example() {
 	var mux rest.ServeMux // инициализируем обработчик запросов
 	// добавляем описание обработчиков, задавая пути, методы и функции их обработки
 	mux.Handles(rest.Paths{
-		// при задании путей можно использовать именованные параметры начинающиеся с ':'
+		// при задании путей можно использовать именованные параметры с ':'
 		"/user/:id": {
 			"GET": func(c *rest.Context) {
 				// можно быстро сформировать ответ в JSON
@@ -64,7 +64,7 @@ func ExampleContext_DataSet() {
 	type myKeyType byte     // определяем собственный тип данных
 	var myKey myKeyType = 1 // генерируем уникальный ключ данных
 	// сохраняем данные в контексте, используя уникальный ключ
-	c.DataSet(myKey, "Test data")
+	c.SetData(myKey, "Test data")
 	// читаем данные с помощью ключа
 	str := c.Data(myKey).(string)
 	fmt.Println(str)

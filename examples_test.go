@@ -13,13 +13,16 @@ var c = new(rest.Context) // test context
 func Example() {
 	var mux rest.ServeMux // инициализируем обработчик запросов
 	// добавляем описание обработчиков, задавая пути, методы и функции их обработки
+	// при задании путей можно использовать именованные параметры (начинающиеся с ':')
 	mux.Handles(rest.Paths{
 		"/user/:id": {
 			"GET": func(c *rest.Context) {
+				// можно быстро сформировать ответ в JSON
 				c.Body(rest.JSON{"user": c.Get("id")})
 			},
 			"POST": func(c *rest.Context) {
 				var data = make(rest.JSON)
+				// можно быстро десериализовать JSON, переданный в запросе, в объект
 				if err := c.Parse(&data); err != nil {
 					c.Code(500).Body(err)
 					return
@@ -29,6 +32,7 @@ func Example() {
 		},
 		"/message/:text": {
 			"GET": func(c *rest.Context) {
+				// параметры пути получаются простым запросом
 				c.Body(rest.JSON{"message": c.Get("text")})
 			},
 		},

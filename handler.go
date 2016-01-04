@@ -94,17 +94,26 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
 func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	context := newContext(w, req) // формируем контекст для ответа
+	// если установлен базовый путь, то отрезаем его
+	if m.BasePath != "" {
+		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)
+		if len(p) == len(context.Request.URL.Path) {
+			context.Status(http.StatusNotFound).Send(nil)
+			return
+		}
+		context.Request.URL.Path = p
+	}
 	// получаем обработчик для указанного пути
 	route, params := m.router.lookup(context.Request.URL.Path)
 	context.Params = append(context.Params, params...)
 	if route == nil {
 		// при статусе больше 399 пустой body формирует JSON с описанием ошибки автоматически
-		context.Code(http.StatusNotFound).Body(nil)
+		context.Status(http.StatusNotFound).Send(nil)
 		return
 	}
 	methods, ok := route.(Methods) // приводим список методов
 	if !ok || len(methods) == 0 {  // если методы не определены, то лучше вернем, что путь не найден
-		context.Code(http.StatusNotFound).Body(nil)
+		context.Status(http.StatusNotFound).Send(nil)
 		return
 	}
 	handler := methods[strings.ToUpper(context.Request.Method)] // запрашиваем обработчик для метода
@@ -114,7 +123,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			allows = append(allows, method)
 		}
 		context.SetHeader("Allow", strings.Join(allows, ", "))
-		context.Code(http.StatusMethodNotAllowed).Body(nil)
+		context.Status(http.StatusMethodNotAllowed).Send(nil)
 		return
 	}
 	if m.Middleware != nil { // если промежуточный обработчик определен, то вызываем его

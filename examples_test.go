@@ -120,6 +120,29 @@ func ExampleServeMux_Handler() {
 		http.StripPrefix("/tmpfiles/", http.FileServer(http.Dir("/tmp"))))
 }
 
+func ExampleServeMux_Handles() {
+	var mux rest.ServeMux
+	mux.Handles(rest.Paths{
+		"/user/:id": {
+			"GET":  user.get,
+			"POST": user.post,
+		},
+		"/message/:text": {"GET": getMessage},
+		"/file/:name":    {"GET": getFile},
+	})
+}
+
+type User struct{}
+
+func (User) get(*rest.Context)  {}
+func (User) post(*rest.Context) {}
+
+var (
+	user       User
+	getMessage = func(*rest.Context) {}
+	getFile    = getMessage
+)
+
 func ExampleServeMux_ServeHTTP() {
 	var mux rest.ServeMux
 	mux.Handle("GET", "/message/:text", func(c *rest.Context) {

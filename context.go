@@ -76,11 +76,11 @@ func (c *Context) Get(key string) string {
 	return c.urlQuery.Get(key)
 }
 
-// Set позволяет добавить новый параметр с заданным именем и значением. Добавление нового параметра
-// с таким же именем не изменяет и не удаляет предыдущего значения, а именно добавляет его в список.
-func (c *Context) Set(key, value string) {
-	c.Params = append(c.Params, Param{key, value})
-}
+// // Set позволяет добавить новый параметр с заданным именем и значением. Добавление нового параметра
+// // с таким же именем не изменяет и не удаляет предыдущего значения, а именно добавляет его в список.
+// func (c *Context) Set(key, value string) {
+// 	c.Params = append(c.Params, Param{key, value})
+// }
 
 // DataGet возвращает пользовательские данные, сохраненные в контексте запроса с указанным ключем.
 func (c *Context) DataGet(key interface{}) interface{} {

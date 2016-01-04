@@ -170,12 +170,13 @@ func (c *Context) Body(data interface{}) {
 		c.status = http.StatusOK
 	}
 	c.Response.WriteHeader(c.status)
+	enc := json.NewEncoder(writer)
 	// в зависимости от типа данных поддерживаются разные методы вывода
 	var err error
 	switch data := data.(type) {
 	case nil: // нечего отдавать
 		if c.status >= 400 { // если статус соответствует ошибке, то формируем текст с ее описанием
-			err = Encode(writer, map[string]interface{}{
+			err = enc.Encode(map[string]interface{}{
 				"code":  c.status,
 				"error": http.StatusText(c.status),
 			})
@@ -188,7 +189,7 @@ func (c *Context) Body(data interface{}) {
 	case []byte: // уже готовый к отдаче набор данных
 		_, err = writer.Write(data) // тоже отдаем как есть
 	case error: // ошибки возвращаем в виде специального JSON
-		err = Encode(writer, map[string]interface{}{
+		err = enc.Encode(map[string]interface{}{
 			"code":  c.status,
 			"error": data.Error(),
 		})
@@ -199,9 +200,9 @@ func (c *Context) Body(data interface{}) {
 		} else {
 			m["message"] = data
 		}
-		err = Encode(writer, m)
+		err = enc.Encode(m)
 	default: // во всех остальных случаях сериализуем в JSON-представление
-		err = Encode(writer, data)
+		err = enc.Encode(data)
 	}
 	// если возникла ошибка, то пытаемся ее вернуть
 	if err != nil {
@@ -211,11 +212,6 @@ func (c *Context) Body(data interface{}) {
 		c.Response.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(writer, err)
 	}
-}
-
-// Encode осуществляет перевод информации в формат JSON.
-func Encode(w io.Writer, data interface{}) error {
-	return json.NewEncoder(w).Encode(data)
 }
 
 // contexts содержит пул контекстов

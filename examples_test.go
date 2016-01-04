@@ -11,7 +11,8 @@ import (
 var c = new(rest.Context) // test context
 
 func Example() {
-	var mux rest.ServeMux
+	var mux rest.ServeMux // инициализируем обработчик запросов
+	// добавляем описание обработчиков, задавая пути, методы и функции их обработки
 	mux.Handles(rest.Paths{
 		"/user/:id": {
 			"GET": func(c *rest.Context) {
@@ -32,8 +33,10 @@ func Example() {
 			},
 		},
 	})
+	// можно сразу задать базовый путь для всех URL, используемых в обработчиках
+	mux.BasePath = "/api/v1"
 	// т.к. поддерживается интерфейс http.Handler, то можно использовать
-	// с любыми стандартными библиотеками
+	// с любыми стандартными библиотеками http
 	http.ListenAndServe(":8080", mux)
 }
 

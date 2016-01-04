@@ -76,14 +76,8 @@ func (c *Context) Get(key string) string {
 	return c.urlQuery.Get(key)
 }
 
-// // Set позволяет добавить новый параметр с заданным именем и значением. Добавление нового параметра
-// // с таким же именем не изменяет и не удаляет предыдущего значения, а именно добавляет его в список.
-// func (c *Context) Set(key, value string) {
-// 	c.Params = append(c.Params, Param{key, value})
-// }
-
-// DataGet возвращает пользовательские данные, сохраненные в контексте запроса с указанным ключем.
-func (c *Context) DataGet(key interface{}) interface{} {
+// Data возвращает пользовательские данные, сохраненные в контексте запроса с указанным ключем.
+func (c *Context) Data(key interface{}) interface{} {
 	if c.data == nil {
 		return nil
 	}
@@ -121,11 +115,11 @@ func (c *Context) SetHeader(key, value string) {
 	}
 }
 
-// ParseBody декодирует содержимое запроса в объект. После чтения из запроса
+// Parse декодирует содержимое запроса в объект. После чтения из запроса
 // http.Request.Body автоматически закрывается и дополнительного закрытия не требуется.
 //
 // На данный момент поддерживается только разбор объектов в формате JSON.
-func (c *Context) ParseBody(obj interface{}) error {
+func (c *Context) Parse(obj interface{}) error {
 	defer c.Request.Body.Close()
 	return json.NewDecoder(c.Request.Body).Decode(obj)
 }

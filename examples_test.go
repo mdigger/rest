@@ -16,7 +16,7 @@ func ExampleContext_DataSet() {
 	// сохраняем данные в контексте, используя уникальный ключ
 	c.DataSet(myKey, "Test data")
 	// читаем данные с помощью ключа
-	str := c.DataGet(myKey).(string)
+	str := c.Data(myKey).(string)
 	fmt.Println(str)
 	// Output: Test data
 }
@@ -41,11 +41,11 @@ func ExampleContext_Code() {
 	c.Code(404).Body(nil)
 }
 
-func ExampleContext_ParseBody() {
+func ExampleContext_Parse() {
 	// инициализируем формат данных для разбора
 	obj := make(map[string]interface{})
 	// читаем запрос и получаем данные в разобранном виде
-	if err := c.ParseBody(&obj); err != nil {
+	if err := c.Parse(&obj); err != nil {
 		panic(err)
 	}
 }
@@ -65,7 +65,7 @@ func ExampleServeMux_Handles() {
 			}),
 			"POST": rest.HandlerFunc(func(c *rest.Context) {
 				var data = make(rest.JSON)
-				if err := c.ParseBody(&data); err != nil {
+				if err := c.Parse(&data); err != nil {
 					c.Code(500).Body(err)
 					return
 				}

@@ -6,16 +6,12 @@ import (
 	"strings"
 )
 
-// Handler описывает интерфейс обработчиков, которые могут принимать Context.
-type Handler interface {
-	ServeHTTPC(*Context) // вызывается для обработки запросов
-}
+// Handler является любая функция, которая принимает Context.
+type Handler func(*Context)
 
-// Func является любая функция, которая принимает Context.
-type Func func(*Context)
-
-// ServeHTTPC поддерживает интерфейс Handler для упрощенных функций обработки.
-func (f Func) ServeHTTPC(c *Context) { f(c) }
+// Middleware описывает вспомогательные обработчики, которые могут использоваться
+// в качестве конвейера обработки запросов.
+type Middleware func(Handler) Handler
 
 // Methods описывает список Handler, ассоциированные с HTTP-методами.
 type Methods map[string]Handler
@@ -24,10 +20,6 @@ type Methods map[string]Handler
 // данного словаря как раз являются пути запросов. Используется в качестве аргумента при вызове
 // метода ServeMux.Handles.
 type Paths map[string]Methods
-
-// Middleware описывает вспомогательные обработчики, которые могут использоваться
-// в качестве конвейера обработки запросов.
-type Middleware func(Handler) Handler
 
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
 //
@@ -87,7 +79,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 // работу, такие параметры будут добавлены к URL в виде именованных параметров, так что с ними
 // можно будет работать через http.Request.URL.Query().Get("name").
 func (m *ServeMux) Handler(method, path string, handler http.Handler) {
-	m.Handle(method, path, Func(func(c *Context) {
+	m.Handle(method, path, func(c *Context) {
 		if len(c.Params) > 0 {
 			urlQuery := make(url.Values, len(c.Params))
 			for _, param := range c.Params {
@@ -100,20 +92,12 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 			c.Request.URL.RawQuery = p
 		}
 		handler.ServeHTTP(c.Response, c.Request)
-	}))
+	})
 }
 
-// serveHTTPC поддерживает интерфейс Handler и отвечает за основную обработку запроса.
-func (m ServeMux) serveHTTPC(context *Context) {
-	// если установлен базовый путь, то отрезаем его
-	if m.BasePath != "" {
-		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)
-		if len(p) == len(context.Request.URL.Path) {
-			context.Code(http.StatusNotFound).Body(nil)
-			return
-		}
-		context.Request.URL.Path = p
-	}
+// ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
+func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	context := newContext(w, req) // формируем контекст для ответа
 	// получаем обработчик для указанного пути
 	route, params := m.router.lookup(context.Request.URL.Path)
 	context.Params = append(context.Params, params...)
@@ -140,10 +124,5 @@ func (m ServeMux) serveHTTPC(context *Context) {
 	if m.Middleware != nil { // если промежуточный обработчик определен, то вызываем его
 		handler = m.Middleware(handler)
 	}
-	handler.ServeHTTPC(context) // вызываем обработчик запроса
-}
-
-// ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
-func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	m.serveHTTPC(newContext(w, req, nil)) // формируем контекст для ответа
+	handler(context) // вызываем обработчик запроса
 }

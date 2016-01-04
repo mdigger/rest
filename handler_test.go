@@ -15,11 +15,11 @@ func TestHandler(t *testing.T) {
 	var mux ServeMux
 	handlers := Paths{
 		"/login": {
-			"GET":  Func(func(c *Context) { c.Body("login GET") }),
-			"POST": Func(func(c *Context) { c.Body("login POST") }),
+			"GET":  func(c *Context) { c.Body("login GET") },
+			"POST": func(c *Context) { c.Body("login POST") },
 		},
 		"/login/:user-id": {
-			"GET": Func(func(c *Context) { c.Body(JSON{"user": c.Get("user-id")}) }),
+			"GET": func(c *Context) { c.Body(JSON{"user": c.Get("user-id")}) },
 		},
 	}
 	mux.Handles(handlers)

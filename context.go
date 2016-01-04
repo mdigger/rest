@@ -42,10 +42,10 @@ type Context struct {
 
 // newContext возвращает новый инициализированный контекст. В отличии от просто создания нового
 // контекста, вызов данного метода использует пул контекстов.
-func newContext(w http.ResponseWriter, r *http.Request, params []Param) *Context {
+func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	context := contexts.Get().(*Context)
 	context.Request = r
-	context.Params = params
+	context.Params = nil
 	context.urlQuery = nil
 	context.data = nil
 	context.Response = w

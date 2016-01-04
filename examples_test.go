@@ -14,22 +14,22 @@ func Example() {
 	var mux rest.ServeMux
 	mux.Handles(rest.Paths{
 		"/user/:id": {
-			"GET": rest.Func(func(c *rest.Context) {
+			"GET": func(c *rest.Context) {
 				c.Body(rest.JSON{"user": c.Get("id")})
-			}),
-			"POST": rest.Func(func(c *rest.Context) {
+			},
+			"POST": func(c *rest.Context) {
 				var data = make(rest.JSON)
 				if err := c.Parse(&data); err != nil {
 					c.Code(500).Body(err)
 					return
 				}
 				c.Body(rest.JSON{"user": c.Get("id"), "data": data})
-			}),
+			},
 		},
 		"/message/:text": {
-			"GET": rest.Func(func(c *rest.Context) {
+			"GET": func(c *rest.Context) {
 				c.Body(rest.JSON{"message": c.Get("text")})
-			}),
+			},
 		},
 	})
 	// т.к. поддерживается интерфейс http.Handler, то можно использовать
@@ -84,9 +84,9 @@ func ExampleContext_SetHeader() {
 
 func ExampleServeMux_Handle() {
 	var mux rest.ServeMux
-	mux.Handle("GET", "/message/:text", rest.Func(func(c *rest.Context) {
+	mux.Handle("GET", "/message/:text", func(c *rest.Context) {
 		c.Body(rest.JSON{"message": c.Get("text")})
-	}))
+	})
 }
 
 func ExampleServeMux_Handler() {
@@ -98,9 +98,9 @@ func ExampleServeMux_Handler() {
 
 func ExampleServeMux_ServeHTTP() {
 	var mux rest.ServeMux
-	mux.Handle("GET", "/message/:text", rest.Func(func(c *rest.Context) {
+	mux.Handle("GET", "/message/:text", func(c *rest.Context) {
 		c.Body(rest.JSON{"message": c.Get("text")})
-	}))
+	})
 	// т.к. поддерживается интерфейс http.Handler, то можно использовать
 	// с любыми стандартными библиотеками
 	http.ListenAndServe(":8080", mux)

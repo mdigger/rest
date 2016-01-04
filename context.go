@@ -13,10 +13,10 @@ import (
 // JSON является вспомогательным типом для быстрого создания JSON-структур.
 type JSON map[string]interface{}
 
-// CompressData разрешает поддержку сжатия данных, если это поддерживается браузером.
+// Compress разрешает поддержку сжатия данных, если это поддерживается браузером.
 // Если сжатие данных уже поддерживается, например, на уровне вашего обработчика, то вы можете
 // заблокировать двойное сжатие, установив значение false.
-var CompressData = true
+var Compress = true
 
 // Context содержит контекстную информацию HTTP-запроса и методы удобного формирования ответа
 // на них.
@@ -134,7 +134,7 @@ func (c *Context) Parse(obj interface{}) error {
 // статуса и текста сообщения. Остальные типы приводятся к формату JSON.
 //
 // Если клиент поддерживает сжатие при передаче данных, то автоматически включается поддержка
-// сжатия ответа. Чтобы отключить данное поведение, необходимо установить флаг CompressData в false.
+// сжатия ответа. Чтобы отключить данное поведение, необходимо установить флаг Compress в false.
 func (c *Context) Body(data interface{}) {
 	var headers = c.Response.Header() // быстрый доступ к заголовкам ответа
 	if c.ContentType == "" {
@@ -143,7 +143,7 @@ func (c *Context) Body(data interface{}) {
 	headers.Set("Content-Type", c.ContentType)
 	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
 	var writer io.Writer = c.Response
-	if CompressData {
+	if Compress {
 		switch accept := c.Request.Header.Get("Accept-Encoding"); {
 		case strings.Contains(accept, "gzip"): // Поддерживается gzip-сжатие
 			headers.Set("Content-Encoding", "gzip")

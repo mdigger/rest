@@ -71,7 +71,7 @@ func ExampleContext_SetData() {
 	// Output: Test data
 }
 
-func ExampleContext_Send() {
+func ExampleContext_Send_file() {
 	// открываем файл
 	file, err := os.Open("README.md")
 	if err != nil {

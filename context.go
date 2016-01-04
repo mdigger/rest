@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -144,14 +143,6 @@ func (c *Context) Parse(obj interface{}) error {
 // Если клиент поддерживает сжатие данных, то автоматически включается поддержка сжатия ответа.
 // Чтобы отключить данное поведение, установите флаг Compress в false.
 func (c *Context) Send(data interface{}) (err error) {
-	defer func() {
-		if recover := recover(); recover != nil {
-			var ok bool
-			if err, ok = recover.(error); !ok {
-				err = fmt.Errorf("rest: %v", recover)
-			}
-		}
-	}()
 	var headers = c.response.Header() // быстрый доступ к заголовкам ответа
 	if c.ContentType == "" {
 		c.ContentType = "application/json; charset=utf-8"

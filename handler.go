@@ -87,7 +87,7 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 			}
 			c.Request.URL.RawQuery = p
 		}
-		handler.ServeHTTP(c.Response, c.Request)
+		handler.ServeHTTP(c.response, c.Request)
 	})
 }
 

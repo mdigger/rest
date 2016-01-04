@@ -25,10 +25,10 @@ type Context struct {
 	*http.Request
 	// именованные параметры из пути запроса
 	Params []Param
-	// интерфейс для публикации ответа на запрос
-	Response http.ResponseWriter
 	// тип информации в ответе
 	ContentType string
+	// интерфейс для публикации ответа на запрос
+	response http.ResponseWriter
 	// код HTTP-ответа
 	status int
 	// разобранные параметры запроса в URL (кеш)
@@ -46,11 +46,11 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	context := contexts.Get().(*Context)
 	context.Request = r
 	context.Params = nil
+	context.ContentType = ""
+	context.response = w
+	context.status = 0
 	context.urlQuery = nil
 	context.data = nil
-	context.Response = w
-	context.ContentType = ""
-	context.status = 0
 	return context
 }
 
@@ -109,9 +109,9 @@ func (c *Context) Code(code int) *Context {
 // значение заголовка пустое, то данный заголовок будет удален.
 func (c *Context) SetHeader(key, value string) {
 	if value == "" {
-		c.Response.Header().Del(key)
+		c.response.Header().Del(key)
 	} else {
-		c.Response.Header().Set(key, value)
+		c.response.Header().Set(key, value)
 	}
 }
 
@@ -136,13 +136,13 @@ func (c *Context) Parse(obj interface{}) error {
 // Если клиент поддерживает сжатие при передаче данных, то автоматически включается поддержка
 // сжатия ответа. Чтобы отключить данное поведение, необходимо установить флаг Compress в false.
 func (c *Context) Body(data interface{}) {
-	var headers = c.Response.Header() // быстрый доступ к заголовкам ответа
+	var headers = c.response.Header() // быстрый доступ к заголовкам ответа
 	if c.ContentType == "" {
 		c.ContentType = "application/json; charset=utf-8"
 	}
 	headers.Set("Content-Type", c.ContentType)
 	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
-	var writer io.Writer = c.Response
+	var writer io.Writer = c.response
 	if Compress {
 		switch accept := c.Request.Header.Get("Accept-Encoding"); {
 		case strings.Contains(accept, "gzip"): // Поддерживается gzip-сжатие
@@ -161,7 +161,7 @@ func (c *Context) Body(data interface{}) {
 	if c.status == 0 {
 		c.status = http.StatusOK
 	}
-	c.Response.WriteHeader(c.status) // отдаем статус ответа
+	c.response.WriteHeader(c.status) // отдаем статус ответа
 	enc := json.NewEncoder(writer)   // инициализируем JSON-encoder
 	// в зависимости от типа данных поддерживаются разные методы вывода
 	var err error
@@ -195,7 +195,7 @@ func (c *Context) Body(data interface{}) {
 		// почти http.Error
 		headers.Set("Content-Type", "text/plain; charset=utf-8")
 		headers.Set("X-Content-Type-Options", "nosniff")
-		c.Response.WriteHeader(http.StatusInternalServerError)
+		c.response.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(writer, err)
 	}
 }

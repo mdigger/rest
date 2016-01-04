@@ -2,6 +2,7 @@ package rest
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -32,7 +33,7 @@ type Middleware func(Handler) Handler
 //
 // Внутри используется достаточно простой и быстрый алгоритм выбора обработчиков, основанный
 // на количестве элементов пути (между разделителями '/'). К сожалению, данный алгоритм не
-// позволяет использовать catch-all параметры и позволяет использовать вложенные мультиплексоры:
+// позволяет использовать catch-all параметры и использовать вложенные мультиплексоры:
 // они просто не будут корректно работать.
 type ServeMux struct {
 	// позволяет задать базовый путь для всех запросов
@@ -56,7 +57,9 @@ func (m *ServeMux) Handles(handlers Paths) {
 	}
 }
 
-// Handle добавляет новый обработчик для указанного пути и метода запроса.
+// Handle добавляет новый обработчик для указанного пути и метода запроса. При задании пути
+// можно использовать именованные параметры (начинаются с символа ':'). В дальнейшем, можно
+// будет получить значения этих параметров, спросив их по имени через метод Context.Get("name").
 func (m *ServeMux) Handle(method, path string, handler Handler) {
 	if method == "" || handler == nil {
 		return
@@ -75,8 +78,23 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 }
 
 // Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
+// Т.к. стандартные обработчики не имеют доступа к Context, то, соответственно, они не могут
+// получить доступ и к именованным параметрам пути. Для того, чтобы хоть как-то облегчить
+// работу, такие параметры будут добавлены к URL в виде именованных параметров, так что с ними
+// можно будет работать через http.Request.URL.Query().Get("name").
 func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 	m.Handle(method, path, Func(func(c *Context) {
+		if len(c.Params) > 0 {
+			urlQuery := make(url.Values, len(c.Params))
+			for _, param := range c.Params {
+				urlQuery.Add(param.Key, param.Value)
+			}
+			p := urlQuery.Encode()
+			if c.Request.URL.RawQuery != "" {
+				p += "&" + c.Request.URL.RawQuery
+			}
+			c.Request.URL.RawQuery = p
+		}
 		handler.ServeHTTP(c.Response, c.Request)
 	}))
 }

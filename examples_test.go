@@ -25,6 +25,7 @@ func Example() {
 				var data = make(rest.JSON)
 				// можно быстро десериализовать JSON, переданный в запросе, в объект
 				if err := c.Parse(&data); err != nil {
+					// возвращать ошибки тоже удобно
 					c.Code(500).Body(err)
 					return
 				}
@@ -36,6 +37,18 @@ func Example() {
 			"GET": func(c *rest.Context) {
 				// параметры пути получаются простым запросом
 				c.Body(rest.JSON{"message": c.Get("text")})
+			},
+		},
+		"/file/:name": {
+			"GET": func(c *rest.Context) {
+				// поддерживает отдачу разного типа данных, в том числе и файлов
+				file, err := os.Open(c.Get(name) + ".html")
+				if err != nil {
+					c.Code(404).Body(nil)
+					return
+				}
+				c.ContentType = `text/html; charset="utf-8"`
+				c.Body(file) // отдаем содержимое файла
 			},
 		},
 	})

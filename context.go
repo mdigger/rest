@@ -135,7 +135,19 @@ func (c *Context) Parse(obj interface{}) error {
 //
 // Если клиент поддерживает сжатие при передаче данных, то автоматически включается поддержка
 // сжатия ответа. Чтобы отключить данное поведение, необходимо установить флаг Compress в false.
-func (c *Context) Body(data interface{}) {
+//
+// Вызов данного метода сразу инициализирует отдачу содержимого в качестве ответа. Поэтому не
+// рекомендуется вызывать его несколько раз, т.к. попытка второй раз вернуть статус ответа
+// приведет к ошибке.
+func (c *Context) Body(data interface{}) (err error) {
+	defer func() {
+		if recover := recover(); recover != nil {
+			var ok bool
+			if err, ok = recover.(error); !ok {
+				err = fmt.Errorf("rest: %v", recover)
+			}
+		}
+	}()
 	var headers = c.response.Header() // быстрый доступ к заголовкам ответа
 	if c.ContentType == "" {
 		c.ContentType = "application/json; charset=utf-8"
@@ -161,10 +173,9 @@ func (c *Context) Body(data interface{}) {
 	if c.status == 0 {
 		c.status = http.StatusOK
 	}
-	c.response.WriteHeader(c.status) // отдаем статус ответа
-	enc := json.NewEncoder(writer)   // инициализируем JSON-encoder
+	c.response.WriteHeader(c.status)
+	enc := json.NewEncoder(writer) // инициализируем JSON-encoder
 	// в зависимости от типа данных поддерживаются разные методы вывода
-	var err error
 	switch data := data.(type) {
 	case nil: // нечего отдавать
 		if c.status >= 400 { // если статус соответствует ошибке, то формируем текст с ее описанием
@@ -190,14 +201,7 @@ func (c *Context) Body(data interface{}) {
 	default: // во всех остальных случаях отдаем JSON-представление
 		err = enc.Encode(data)
 	}
-	// если возникла ошибка, то пытаемся ее вернуть
-	if err != nil {
-		// почти http.Error
-		headers.Set("Content-Type", "text/plain; charset=utf-8")
-		headers.Set("X-Content-Type-Options", "nosniff")
-		c.response.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintln(writer, err)
-	}
+	return err
 }
 
 // contexts содержит пул контекстов

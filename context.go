@@ -143,23 +143,22 @@ func (c *Context) Parse(obj interface{}) error {
 // Если клиент поддерживает сжатие данных, то автоматически включается поддержка сжатия ответа.
 // Чтобы отключить данное поведение, установите флаг Compress в false.
 func (c *Context) Send(data interface{}) (err error) {
-	var headers = c.response.Header() // быстрый доступ к заголовкам ответа
 	if c.ContentType == "" {
 		c.ContentType = "application/json; charset=utf-8"
 	}
-	headers.Set("Content-Type", c.ContentType)
+	c.SetHeader("Content-Type", c.ContentType)
 	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
 	var writer io.Writer = c.response
 	if Compress {
 		switch accept := c.Request.Header.Get("Accept-Encoding"); {
 		case strings.Contains(accept, "gzip"): // Поддерживается gzip-сжатие
-			headers.Set("Content-Encoding", "gzip")
-			headers.Add("Vary", "Accept-Encoding")
+			c.SetHeader("Content-Encoding", "gzip")
+			c.response.Header().Add("Vary", "Accept-Encoding")
 			writer = gzipGet(writer)
 			defer gzipPut(writer.(io.Closer))
 		case strings.Contains(accept, "deflate"): // Поддерживается deflate-сжатие
-			headers.Set("Content-Encoding", "deflate")
-			headers.Add("Vary", "Accept-Encoding")
+			c.SetHeader("Content-Encoding", "deflate")
+			c.response.Header().Add("Vary", "Accept-Encoding")
 			writer = deflateGet(writer)
 			defer deflatePut(writer.(io.Closer))
 		}

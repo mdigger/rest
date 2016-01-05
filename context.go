@@ -135,6 +135,11 @@ func (c *Context) Parse(obj interface{}) error {
 	return json.NewDecoder(reader).Decode(obj)
 }
 
+// Error возвращает в качестве ответа 500 ошибку.
+func (c *Context) Error(err error) {
+	c.Status(http.StatusInternalServerError).Send(err)
+}
+
 // Send публикует данные, переданные в параметре, в качестве ответа. Если ContentType не указан,
 // то используется "application/json".
 //

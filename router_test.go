@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/kr/pretty"
 )
 
 var urls = []string{
@@ -38,12 +36,12 @@ func TestRouter(t *testing.T) {
 		if handler == nil {
 			t.Error("Nil handler:", url)
 		}
-		pretty.Println(handler, params)
+		ftm.Println(handler, params)
 	}
 	url := "/user/:id/param1/"
 	handler, params := r.lookup(url)
 	if handler != nil {
 		t.Error("Bad handler:", url)
 	}
-	pretty.Println(handler, params)
+	ftm.Println(handler, params)
 }

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -161,27 +162,25 @@ func (c *Context) Send(data interface{}) (err error) {
 	}
 	c.SetHeader("Content-Type", c.ContentType)
 	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
-	var writer io.Writer = c.response
-	if Compress {
-		switch accept := c.Request.Header.Get("Accept-Encoding"); {
-		case strings.Contains(accept, "gzip"): // Поддерживается gzip-сжатие
-			c.SetHeader("Content-Encoding", "gzip")
-			c.response.Header().Add("Vary", "Accept-Encoding")
-			writer = gzipGet(writer)
-			defer gzipPut(writer.(io.Closer))
-		case strings.Contains(accept, "deflate"): // Поддерживается deflate-сжатие
-			c.SetHeader("Content-Encoding", "deflate")
-			c.response.Header().Add("Vary", "Accept-Encoding")
-			writer = deflateGet(writer)
-			defer deflatePut(writer.(io.Closer))
-		}
+	var w io.Writer = c.response
+	// Поддерживается gzip-сжатие
+	if Compress && strings.Contains(c.Request.Header.Get("Accept-Encoding"), "gzip") {
+		c.SetHeader("Content-Encoding", "gzip")
+		c.response.Header().Add("Vary", "Accept-Encoding")
+		gzw := gzipPool.Get().(*gzip.Writer)
+		gzw.Reset(w)
+		defer func() {
+			gzw.Close()
+			gzipPool.Put(gzw)
+		}()
+		w = gzw
 	}
 	// обрабатываем статус выполнения запроса
 	if c.status == 0 {
 		c.status = http.StatusOK
 	}
 	c.response.WriteHeader(c.status)
-	enc := json.NewEncoder(writer) // инициализируем JSON-encoder
+	enc := json.NewEncoder(w) // инициализируем JSON-encoder
 	// в зависимости от типа данных поддерживаются разные методы вывода
 	switch data := data.(type) {
 	case nil: // нечего отдавать
@@ -189,12 +188,12 @@ func (c *Context) Send(data interface{}) (err error) {
 			err = enc.Encode(JSON{"code": c.status, "error": http.StatusText(c.status)})
 		}
 	case io.Reader: // поток данных отдаем как есть
-		_, err = io.Copy(writer, data)
+		_, err = io.Copy(w, data)
 		if data, ok := data.(io.Closer); ok {
 			data.Close() // закрываем по окончании, раз поддерживается
 		}
 	case []byte: // уже готовый к отдаче набор данных
-		_, err = writer.Write(data) // тоже отдаем как есть
+		_, err = w.Write(data) // тоже отдаем как есть
 	case error: // ошибки возвращаем в виде специального JSON
 		err = enc.Encode(JSON{"code": c.status, "error": data.Error()})
 	case string: // строки тоже возвращаем в виде специального JSON
@@ -211,5 +210,7 @@ func (c *Context) Send(data interface{}) (err error) {
 	return err
 }
 
-// contexts содержит пул контекстов
-var contexts = sync.Pool{New: func() interface{} { return new(Context) }}
+var (
+	contexts = sync.Pool{New: func() interface{} { return new(Context) }}
+	gzipPool = sync.Pool{New: func() interface{} { return new(gzip.Writer) }}
+)

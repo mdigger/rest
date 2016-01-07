@@ -47,8 +47,6 @@ func TestRouter(t *testing.T) {
 		t.Error("Bad handler:", url)
 	}
 	fmt.Println(handler, params)
-<<<<<<< HEAD
-=======
 	handler, params = r.lookup("/user/test/mama/1/2/3/4/5/6/7/8/9/0/")
 	if handler != nil {
 		t.Error("Bad handler:", url)
@@ -90,5 +88,4 @@ func TestOnlyStaticRouter(t *testing.T) {
 	if handler != nil {
 		t.Error("Bad handler:", "/test2")
 	}
->>>>>>> mdigger/master
 }

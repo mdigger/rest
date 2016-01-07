@@ -27,7 +27,7 @@ func TestHandler(t *testing.T) {
 	}
 	mux.Handles(handlers)
 	mux.Handle("GET", "/test", func(c *Context) { c.Send("OK") })
-	mux.Handler("GET", "/test/:name", http.NotFound)
+	// mux.Handler("GET", "/test/:name", http.NotFound)
 	mux.BasePath = "/api/v1"
 	mux.Middleware = func(h Handler) Handler {
 		return h

@@ -21,7 +21,7 @@ func TestHandler(t *testing.T) {
 		"/login/:user-id": {
 			"GET": func(c *Context) { c.Send(JSON{"user": c.Get("user-id")}) },
 		},
-		"/test-query": {
+		"/test-query/:t": {
 			"GET": func(c *Context) { c.Send(JSON{"query": c.Get("param")}) },
 		},
 	}
@@ -69,7 +69,7 @@ func TestHandler(t *testing.T) {
 
 	fmt.Println(strings.Repeat("-", 40))
 
-	res, err = client.Get(ts.URL + mux.BasePath + "/test-query?param=param-name")
+	res, err = client.Get(ts.URL + mux.BasePath + "/test-query/1?param=param-name")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Add("Accept-Encoding", "deflate")
-	res, err = client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}

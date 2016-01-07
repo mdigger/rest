@@ -121,4 +121,20 @@ func TestHandler(t *testing.T) {
 	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
 	res.Write(os.Stdout)
 
+	fmt.Println(strings.Repeat("-", 40))
+
+	req, err := http.NewRequest("GET", ts.URL+mux.BasePath+"/login", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("Accept-Encoding", "deflate")
+	res, err = client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
 }

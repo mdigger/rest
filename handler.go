@@ -69,7 +69,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	m.Handles(Paths{path: Methods{method: handler}})
 }
 
-// Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
+// Handler позволяет привязать к нашему описанию стандартный обработчик http.HandlerFunc.
 //
 // Т.к. стандартные обработчики не имеют доступа к Context, то, соответственно, они не могут
 // получить доступ и к именованным параметрам пути. Для того, чтобы хоть как-то облегчить

@@ -75,7 +75,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 // получить доступ и к именованным параметрам пути. Для того, чтобы хоть как-то облегчить
 // работу, такие параметры будут добавлены к URL в виде именованных параметров, так что с ними
 // можно будет работать через http.Request.URL.Query().Get("name").
-func (m *ServeMux) Handler(method, path string, handler http.Handler) {
+func (m *ServeMux) Handler(method, path string, handler http.HandlerFunc) {
 	m.Handle(method, path, func(c *Context) {
 		if len(c.Params) > 0 {
 			urlQuery := make(url.Values, len(c.Params))

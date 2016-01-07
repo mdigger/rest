@@ -36,12 +36,12 @@ func TestRouter(t *testing.T) {
 		if handler == nil {
 			t.Error("Nil handler:", url)
 		}
-		ftm.Println(handler, params)
+		fmt.Println(handler, params)
 	}
 	url := "/user/:id/param1/"
 	handler, params := r.lookup(url)
 	if handler != nil {
 		t.Error("Bad handler:", url)
 	}
-	ftm.Println(handler, params)
+	fmt.Println(handler, params)
 }

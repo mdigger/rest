@@ -95,6 +95,7 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
 func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	context := newContext(w, req) // формируем контекст для ответа
+	defer context.free()          // освобождаем по окончании
 	// если установлен базовый путь, то отрезаем его
 	if m.BasePath != "" {
 		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)

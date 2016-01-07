@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/geotrace/rest"
+	"github.com/mdigger/rest"
 )
 
 var c = new(rest.Context) // test context

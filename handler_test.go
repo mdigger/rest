@@ -128,7 +128,7 @@ func TestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Add("Accept-Encoding", "deflate")
-	res, err := client.Do(req)
+	res, err = client.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}

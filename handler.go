@@ -69,13 +69,13 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	m.Handles(Paths{path: Methods{method: handler}})
 }
 
-// Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
+// Handler позволяет привязать к нашему описанию стандартный обработчик http.HandlerFunc.
 //
 // Т.к. стандартные обработчики не имеют доступа к Context, то, соответственно, они не могут
 // получить доступ и к именованным параметрам пути. Для того, чтобы хоть как-то облегчить
 // работу, такие параметры будут добавлены к URL в виде именованных параметров, так что с ними
 // можно будет работать через http.Request.URL.Query().Get("name").
-func (m *ServeMux) Handler(method, path string, handler http.Handler) {
+func (m *ServeMux) Handler(method, path string, handler http.HandlerFunc) {
 	m.Handle(method, path, func(c *Context) {
 		if len(c.Params) > 0 {
 			urlQuery := make(url.Values, len(c.Params))
@@ -95,6 +95,7 @@ func (m *ServeMux) Handler(method, path string, handler http.Handler) {
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
 func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	context := newContext(w, req) // формируем контекст для ответа
+	defer context.free()          // освобождаем по окончании
 	// если установлен базовый путь, то отрезаем его
 	if m.BasePath != "" {
 		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)

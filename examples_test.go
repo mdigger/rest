@@ -47,7 +47,13 @@ func Example() {
 					c.Status(404).Send(nil)
 					return
 				}
-				c.ContentType = `text/html; charset="utf-8"`
+				// можно получать не только именованные элементы пути, но
+				// параметры, используемые в запросе
+				if c.Get("format") == "raw" {
+					c.ContentType = `text; charset="utf-8"`
+				} else {
+					c.ContentType = `text/html; charset="utf-8"`
+				}
 				c.Send(file) // отдаем содержимое файла
 				// закрытие файла произойдет автоматически
 			},

@@ -21,9 +21,17 @@ func TestHandler(t *testing.T) {
 		"/login/:user-id": {
 			"GET": func(c *Context) { c.Send(JSON{"user": c.Get("user-id")}) },
 		},
+		"/test-query/:t": {
+			"GET": func(c *Context) { c.Send(JSON{"query": c.Get("param")}) },
+		},
 	}
 	mux.Handles(handlers)
+	mux.Handle("GET", "/test", func(c *Context) { c.Send("OK") })
+	mux.Handler("GET", "/test/:name", http.NotFound)
 	mux.BasePath = "/api/v1"
+	mux.Middleware = func(h Handler) Handler {
+		return h
+	}
 	ts := httptest.NewTLSServer(mux)
 	defer ts.Close()
 
@@ -58,5 +66,75 @@ func TestHandler(t *testing.T) {
 	}
 	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
 	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	res, err = client.Get(ts.URL + mux.BasePath + "/test-query/1?param=param-name")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	res, err = client.Get(ts.URL + mux.BasePath + "/test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	res, err = client.Get(ts.URL + mux.BasePath + "/test/test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	res, err = client.Get(ts.URL + mux.BasePath + "/test/test/test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	res, err = client.Get(ts.URL + "/test/test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	res, err = client.Post(ts.URL+mux.BasePath+"/test", "", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+	req, err := http.NewRequest("GET", ts.URL+mux.BasePath+"/login", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("Accept-Encoding", "deflate")
+	res, err = client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
 
 }

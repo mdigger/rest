@@ -89,3 +89,21 @@ func TestOnlyStaticRouter(t *testing.T) {
 		t.Error("Bad handler:", "/test2")
 	}
 }
+
+func TestRouterSort(t *testing.T) {
+	var r router
+	var urls = []string{
+		"/1/2/3/",
+		"/:1/2/3/",
+		"/1/:2/3/",
+		"/1/2/:3/",
+		"/:1/:2/3/",
+		"/:1/2/:3/",
+		"/1/:2/:3/",
+	}
+	for _, url := range urls {
+		if err := r.add(url, "long"); err != nil {
+			t.Error(err)
+		}
+	}
+}

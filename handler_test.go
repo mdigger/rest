@@ -138,3 +138,22 @@ func TestHandler(t *testing.T) {
 	fmt.Println(strings.Repeat("-", 40))
 
 }
+
+func TestHandler2(t *testing.T) {
+	var mux ServeMux
+	mux.Handler("GET", "/test/:name", http.NotFoundHandler())
+	mux.Handler("POST", "/test/:name", http.NotFoundHandler())
+	mux.Handle("HEAD", "/test/:name", nil)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL + mux.BasePath + "/test/name-param?id=1")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%s %s ", res.Request.Method, res.Request.URL.Path)
+	res.Write(os.Stdout)
+
+	fmt.Println(strings.Repeat("-", 40))
+
+}

@@ -60,10 +60,8 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	// предполагаем, что обработчик для данного пути уже есть
 	if route, _ := m.router.lookup(path); route != nil {
 		// в роутере хранятся обработчики с привязкой к методам
-		if methods, ok := route.(Methods); ok {
-			methods[method] = handler // добавляем новый обработчик пути для данного метода
-			return
-		}
+		route.(Methods)[method] = handler // добавляем новый обработчик пути для данного метода
+		return
 	}
 	// обработчик для данного пути не определен
 	m.Handles(Paths{path: Methods{method: handler}})

@@ -122,8 +122,8 @@ func ExampleServeMux_Handle() {
 func ExampleServeMux_Handler() {
 	var mux rest.ServeMux
 	// в качестве обработчиков можно использовать стандартные обработчики http
-	mux.Handler("GET", "/tmpfiles/",
-		http.StripPrefix("/tmpfiles/", http.FileServer(http.Dir("/tmp"))))
+	mux.Handler("GET", "/files/:filename",
+		http.StripPrefix("/files/", http.FileServer(http.Dir("/tmp"))))
 }
 
 func ExampleServeMux_Handles() {

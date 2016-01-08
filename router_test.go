@@ -11,9 +11,9 @@ var urls = []string{
 	"/user/:id/param",
 	"/user/:id",
 	"/user/test",
-	"/user/:id/param2",
-	"/user/vova/param2",
 	"/user/vova/:param",
+	"/user/:vova/param3",
+	"/user/:id/param2",
 	"/user",
 }
 

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -161,55 +162,56 @@ func (c *Context) Send(data interface{}) (err error) {
 	}
 	c.SetHeader("Content-Type", c.ContentType)
 	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
-	var writer io.Writer = c.response
-	if Compress {
-		switch accept := c.Request.Header.Get("Accept-Encoding"); {
-		case strings.Contains(accept, "gzip"): // Поддерживается gzip-сжатие
-			c.SetHeader("Content-Encoding", "gzip")
-			c.response.Header().Add("Vary", "Accept-Encoding")
-			writer = gzipGet(writer)
-			defer gzipPut(writer.(io.Closer))
-		case strings.Contains(accept, "deflate"): // Поддерживается deflate-сжатие
-			c.SetHeader("Content-Encoding", "deflate")
-			c.response.Header().Add("Vary", "Accept-Encoding")
-			writer = deflateGet(writer)
-			defer deflatePut(writer.(io.Closer))
-		}
+	var w io.Writer = c.response
+	// Поддерживается gzip-сжатие
+	if Compress && strings.Contains(c.Request.Header.Get("Accept-Encoding"), "gzip") {
+		c.SetHeader("Content-Encoding", "gzip")
+		c.response.Header().Add("Vary", "Accept-Encoding")
+		gzw := gzipPool.Get().(*gzip.Writer)
+		gzw.Reset(w)
+		defer func() {
+			gzw.Close()
+			gzipPool.Put(gzw)
+		}()
+		w = gzw
 	}
 	// обрабатываем статус выполнения запроса
 	if c.status == 0 {
 		c.status = http.StatusOK
 	}
 	c.response.WriteHeader(c.status)
-	enc := json.NewEncoder(writer) // инициализируем JSON-encoder
+	enc := json.NewEncoder(w) // инициализируем JSON-encoder
 	// в зависимости от типа данных поддерживаются разные методы вывода
 	switch data := data.(type) {
 	case nil: // нечего отдавать
 		if c.status >= 400 { // если статус соответствует ошибке, то формируем текст с ее описанием
-			err = enc.Encode(JSON{"code": c.status, "error": http.StatusText(c.status)})
+			err = enc.Encode(message{c.status, http.StatusText(c.status)})
 		}
+	case error: // ошибки возвращаем в виде специального JSON
+		err = enc.Encode(message{c.status, data.Error()})
+	case string: // строки тоже возвращаем в виде специального JSON
+		err = enc.Encode(message{c.status, data})
+	case []byte: // уже готовый к отдаче набор данных
+		_, err = w.Write(data) // тоже отдаем как есть
 	case io.Reader: // поток данных отдаем как есть
-		_, err = io.Copy(writer, data)
+		_, err = io.Copy(w, data)
 		if data, ok := data.(io.Closer); ok {
 			data.Close() // закрываем по окончании, раз поддерживается
 		}
-	case []byte: // уже готовый к отдаче набор данных
-		_, err = writer.Write(data) // тоже отдаем как есть
-	case error: // ошибки возвращаем в виде специального JSON
-		err = enc.Encode(JSON{"code": c.status, "error": data.Error()})
-	case string: // строки тоже возвращаем в виде специального JSON
-		m := JSON{"code": c.status}
-		if c.status >= 400 { // в случае ошибок это будет error
-			m["error"] = data
-		} else { // с случае просто текстовых сообщений — message
-			m["message"] = data
-		}
-		err = enc.Encode(m)
 	default: // во всех остальных случаях отдаем JSON-представление
 		err = enc.Encode(data)
 	}
 	return err
 }
 
-// contexts содержит пул контекстов
-var contexts = sync.Pool{New: func() interface{} { return new(Context) }}
+// message описывает формат возвращаемого ответа по умолчанию
+type message struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+// пулы контекстов и gzip-сжатия
+var (
+	contexts = sync.Pool{New: func() interface{} { return new(Context) }}
+	gzipPool = sync.Pool{New: func() interface{} { return new(gzip.Writer) }}
+)

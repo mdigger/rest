@@ -1,76 +1,162 @@
 package rest
 
 import (
-	"compress/gzip"
-	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
+	"os"
+	"strconv"
 	"sync"
 )
 
-// JSON является вспомогательным типом для быстрого создания JSON-структур.
-type JSON map[string]interface{}
-
-// Compress разрешает поддержку сжатия данных, если это поддерживается браузером.
-// Если сжатие данных уже поддерживается, например, на уровне вашего обработчика, то вы можете
-// заблокировать двойное сжатие, установив значение false.
-var Compress = true
-
-// MaxBytes ограничивает размер данных, принимаемых в запросе. Если данных будет больше указанного
-// размера, то они просто обрежутся. Это связано, в первую очередь, с защитой сервера от слишком
-// больших запросов.
-var MaxBytes int64 = 1 << 25 // 32 мегабайта
-
-// Context содержит контекстную информацию HTTP-запроса и методы удобного формирования ответа
-// на них. Т.к. http.Request импортируется в контекст напрямую, то можно совершенно спокойно
-// использовать все его свойства и методы, как родные свойства и методы самого контекста.
+// Context содержит контекстную информацию HTTP-запроса и методы формирования ответа на них.
+// Т.к. http.Request импортируется в Context напрямую, то можно использовать все его свойства и
+// методы, как родные свойства и методы самого контекста.
+//
+// Context скрывает http.ResponseWriter от прямого использования и, вместо этого, предоставляет
+// свои методы для формирования ответа. Это позволяет обойти некоторые скользкие моменты и, иногда,
+// несколько упростить код.
+//
+// При отдаче ответа анализируются первые байты данных и на основании них устанавливается тип
+// ответа. Если вы хотите определить тип ответа самостоятельно, то проще всего установить значение
+// ContentType строкой с описанием нужного типа.
+//
+// Для кодирования строк, ошибок и объектов используется кодировщик по умолчанию (JSON), если не
+// задано другого при инициализации ServeMux.
 type Context struct {
-	// HTTP запрос в разобранном виде
-	*http.Request
-	// именованные параметры из пути запроса
-	Params []Param
-	// тип информации в ответе
-	ContentType string
-	// интерфейс для публикации ответа на запрос
-	response http.ResponseWriter
-	// код HTTP-ответа
-	status int
-	// разобранные параметры запроса в URL (кеш)
-	urlQuery url.Values
-	// дополнительные данные, устанавливаемые пользователем
-	// в качестве ключа рекомендуется использовать приватный тип
-	// и какое-нибудь его значение, что позволит застраховаться от
-	// случайной перезаписи этих данных
-	data map[interface{}]interface{}
+	*http.Request         // HTTP запрос в разобранном виде
+	Params        []Param // именованные параметры из пути запроса
+	ContentType   string  // тип информации в ответе
+
+	response http.ResponseWriter         // интерфейс для публикации ответа на запрос
+	status   int                         // код HTTP-ответа
+	sended   bool                        // флаг, что ответ уже отослан (заголовок ответа отдан)
+	urlQuery url.Values                  // разобранные параметры запроса в URL (кеш)
+	data     map[interface{}]interface{} // дополнительные данные, устанавливаемые пользователем.
+	coder    Coder                       // кодировщик ответов и разборщик запросов
 }
 
 // newContext возвращает новый инициализированный контекст. В отличии от просто создания нового
 // контекста, вызов данного метода использует пул контекстов.
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
-	context := contexts.Get().(*Context)
+	context := contexts.Get().(*Context) // получаем контекст из пула контекстов
+	// очищаем его от возможных старых данных
 	context.Request = r
 	context.Params = nil
 	context.ContentType = ""
 	context.response = w
 	context.status = 0
+	context.sended = false
 	context.urlQuery = nil
 	context.data = nil
+	context.coder = defaultCoder
 	return context
 }
 
-// free возвращает контекст в пул используемых контекстов для дальнейшего использования.
-// Вызывается автоматически после того, как контекст перестает использоваться.
-func (c *Context) free() {
-	contexts.Put(c)
+// close возвращает контекст в пул используемых контекстов для дальнейшего использования.
+// Вызывается автоматически после того, как контекст перестает использоваться. Закрывает
+// Request.Body.
+func (c *Context) close() {
+	c.Request.Body.Close() // закрываем запрос по окончании, если вдруг забыли это сделать
+	contexts.Put(c)        // возвращаем контекст в пул контекстов для повторного использования
 }
 
-// Get возвращает значение именованного параметра. Если параметр с таким именем не найден,
-// то возвращается значение параметра из URL с тем же именем. Разбор параметров запроса сохраняется
-// внутри Context и повторного его разбора уже не требует, но это происходит только при первом
-// к ним обращении.
-func (c *Context) Get(key string) string {
+// Header возвращает HTTP-заголовки ответа.
+func (c *Context) Header() http.Header {
+	return c.response.Header()
+}
+
+// Write возвращает данные из параметра в качестве ответа сервера. Автоматически устанавливает
+// статус ответа в http.StatusOK, если не было указано другого статуса, а так же взводит внутренний
+// флаг, что отсылка ответа начата. Если не был установлен заголовок `Content-Type`, то определяет
+// тип информации по первым байтам данных и автоматически устанавливает его при записи первой
+// порции информации. При этом свойство Context.ContentType не используется.
+func (c *Context) Write(data []byte) (int, error) {
+	if !c.sended {
+		if c.Header().Get("Content-Type") == "" {
+			c.SetHeader("Content-Type", http.DetectContentType(data))
+		}
+		c.WriteHeader(c.status)
+	}
+	return c.response.Write(data)
+}
+
+// WriteHeader записывает заголовок ответа. Вызов метода автоматически взводит внутренний флаг,
+// что отправка ответа начата. После его вызова отсылка каких-либо данных другим способом, кроме
+// Write уже не поддерживается.
+func (c *Context) WriteHeader(code int) {
+	c.status = code
+	if c.status == 0 {
+		c.status = http.StatusOK
+	} else if c.status < 100 || c.status >= 600 {
+		c.status = http.StatusInternalServerError
+	}
+	c.sended = true
+	c.response.WriteHeader(c.status)
+}
+
+// Flush отдает накопленный буфер с ответом, если поддерживается. Метод срабатывает только, если
+// хоть какая-то часть данных уже передана.
+func (c *Context) Flush() {
+	if flusher, ok := c.response.(http.Flusher); ok && c.sended {
+		flusher.Flush()
+	}
+}
+
+// Status устанавливает код HTTP-ответа, который будет отправлен сервером. Вызов данного метода
+// не приводит к немедленной отправке ответа, а только устанавливает внутренний статус.
+//
+// Метод возвращает ссылку на основной контекст, чтобы можно было использовать его в
+// последовательности выполнения команд. Например, можно сразу установить код ответа и тут же
+// опубликовать данные.
+func (c *Context) Status(code int) *Context {
+	if !c.sended && code >= 200 && code < 600 {
+		c.status = code
+	}
+	return c
+}
+
+// SetHeader устанавливает новое значение для указанного HTTP-заголовка ответа. Все записи с таким
+// же именем заголовка будут перезаписаны. Если передаваемое значение заголовка пустое, то данный
+// заголовок будет удален.
+//
+// Если устанавливается заголовок `Content-Type`, то соответствующее свойство контекста тоже
+// принимает это же значение. Заголовок `Content-Length` будет установлен только в том случае,
+// если ответ не сжимается (проверка проводится по заголовку ответа).
+func (c *Context) SetHeader(key, value string) *Context {
+	if !c.sended { // нельзя изменить заголовок после ответа
+		switch key {
+		case "Content-Type":
+			c.ContentType = value
+		case "Content-Length":
+			if c.Header().Get("Content-Encoding") != "" {
+				value = "" // не устанавливаем длину, если поддерживается сжатие ответа
+			}
+		}
+		if value == "" {
+			c.response.Header().Del(key) // удаляем ключ, если пустое значение
+		} else {
+			c.response.Header().Set(key, value) // перезаписываем или создаем ключ заголовка
+		}
+	}
+	return c // возвращаем контекст, чтобы поддержать конвейер
+}
+
+// Parse декодирует содержимое запроса в объект. Максимальный размер содержимого запроса ограничен
+// размером MaxBytes, если установлен. Возвращает ошибку HTTPError, если данные не соответствуют
+// формату JSON или не получается их разобрать.
+func (c *Context) Parse(data interface{}) *HTTPError {
+	defer c.Request.Body.Close()   // закрываем по окончании
+	return c.coder.Decode(c, data) // декодируем запрос и возвращаем ошибку, если случилась
+}
+
+// Param возвращает значение именованного параметра. Если параметр с таким именем не найден,
+// то возвращается значение параметра из URL с тем же именем.
+//
+// Разобранные параметры запроса пути сохраняются внутри Context и повторного его разбора уже не
+// требует. Но это происходит только при первом к ним обращении.
+func (c *Context) Param(key string) string {
 	for _, param := range c.Params {
 		if param.Key == key {
 			return param.Value
@@ -83,8 +169,8 @@ func (c *Context) Get(key string) string {
 }
 
 // Data возвращает пользовательские данные, сохраненные в контексте запроса с указанным ключем.
-// Обычно, такие данные сохраняются в контексте запроса, если его нужно передать между несколькими
-// обработчиками. В частности, очень удобно использовать c Middleware-обработчиками.
+// Обычно такие данные сохраняются в контексте запроса, если их нужно передать между несколькими
+// обработчиками.
 func (c *Context) Data(key interface{}) interface{} {
 	if c.data == nil {
 		return nil
@@ -96,7 +182,7 @@ func (c *Context) Data(key interface{}) interface{} {
 //
 // Рекомендуется в качестве ключа использовать какой-нибудь приватный тип и его значение,
 // чтобы избежать случайного затирания данных другими обработчиками: это гарантированно обезопасит
-// от случайного доступа к ним.
+// от случайного доступа к ним. Но строки тоже поддерживаются. :)
 func (c *Context) SetData(key, value interface{}) {
 	if c.data == nil {
 		c.data = make(map[interface{}]interface{})
@@ -104,45 +190,18 @@ func (c *Context) SetData(key, value interface{}) {
 	c.data[key] = value
 }
 
-// Status устанавливает код HTTP-ответа, который будет отправлен сервером. Данный метод возвращает
-// ссылку на основной контекст, чтобы можно было использовать его в последовательности выполнения
-// команд. Например, можно сразу установить код ответа и тут же опубликовать данные.
-func (c *Context) Status(code int) *Context {
-	if code >= 200 && code < 600 {
-		c.status = code
-	}
-	return c
+// Error возвращает ошибку с указанным кодом окончания запроса. Является просто удобным способом
+// сформировать ошибку HTTPError. Эту ошибку можно вернуть в качестве ошибки выполнения обработки.
+func (c *Context) Error(code int) *HTTPError {
+	return NewHTTPError(code)
 }
 
-// SetHeader устанавливает новое значение для указанного HTTP-заголовка. Если передаваемое
-// значение заголовка пустое, то данный заголовок будет удален.
-func (c *Context) SetHeader(key, value string) {
-	if value == "" {
-		c.response.Header().Del(key)
-	} else {
-		c.response.Header().Set(key, value)
-	}
-}
+// ErrDoubleSend возвращается Context.Send в случае повторной попытки послать данные, когда
+// ответ уже был отправлен.
+var ErrDoubleSend = errors.New("double send")
 
-// Parse декодирует содержимое запроса в объект. После чтения из запроса
-// http.Request.Body автоматически закрывается и дополнительного закрытия не требуется.
-//
-// Размер читаемого содержимого запроса ограничен размером MaxBytes.
-//
-// На данный момент поддерживается только разбор объектов в формате JSON.
-func (c *Context) Parse(obj interface{}) error {
-	defer c.Request.Body.Close()
-	reader := io.LimitReader(c.Request.Body, MaxBytes)
-	return json.NewDecoder(reader).Decode(obj)
-}
-
-// Error возвращает в качестве ответа 500 ошибку.
-func (c *Context) Error(err error) {
-	c.Status(http.StatusInternalServerError).Send(err)
-}
-
-// Send публикует данные, переданные в параметре, в качестве ответа. Если ContentType не указан,
-// то используется "application/json".
+// Send публикует переданные в параметре данные в качестве ответа. Если context.ContentType
+// не указан, то используется тип данных будет определен по первым отдаваемым байтам.
 //
 // В зависимости от типа передаваемых данных, ответ формируется по разному.
 // Если данные являются бинарными ([]byte) или поддерживают интерфейс io.Reader, то отдаются
@@ -150,68 +209,89 @@ func (c *Context) Error(err error) {
 // автоматически закрыт. Строки и ошибки преобразуются в простое JSON-сообщение, состоящие из кода
 // статуса и текста сообщения. Остальные типы приводятся к формату JSON.
 //
-// Вызов данного метода сразу инициализирует отдачу содержимого в качестве ответа. Поэтому не
-// рекомендуется вызывать его несколько раз, т.к. попытка второй раз записать статус ответа
-// приведет к ошибке.
+// Вызов данного метода сразу инициализирует отдачу содержимого в качестве ответа. Поэтому нет
+// смысла вызывать его несколько раз, т.к. нельзя второй раз записать разные коды ответа. В случае
+// повторного вызова этого метода, когда данные уже были отданы, будет возвращена ошибка
+// ErrDoubleSend.
 //
 // Если клиент поддерживает сжатие данных, то автоматически включается поддержка сжатия ответа.
 // Чтобы отключить данное поведение, установите флаг Compress в false.
-func (c *Context) Send(data interface{}) (err error) {
-	if c.ContentType == "" {
-		c.ContentType = "application/json; charset=utf-8"
+func (c *Context) Send(data interface{}) error {
+	if c.sended {
+		return ErrDoubleSend // уже отправлено сообщение — ничего больше изменить не получится
 	}
-	c.SetHeader("Content-Type", c.ContentType)
-	// поддерживаем компрессию, если она поддерживается клиентом и не запрещена в библиотеке
-	var w io.Writer = c.response
-	// Поддерживается gzip-сжатие
-	if Compress && strings.Contains(c.Request.Header.Get("Accept-Encoding"), "gzip") {
-		c.SetHeader("Content-Encoding", "gzip")
-		c.response.Header().Add("Vary", "Accept-Encoding")
-		gzw := gzipPool.Get().(*gzip.Writer)
-		gzw.Reset(w)
-		defer func() {
-			gzw.Close()
-			gzipPool.Put(gzw)
-		}()
-		w = gzw
+	if c.ContentType != "" {
+		c.SetHeader("Content-Type", c.ContentType)
 	}
-	// обрабатываем статус выполнения запроса
-	if c.status == 0 {
-		c.status = http.StatusOK
-	}
-	c.response.WriteHeader(c.status)
-	enc := json.NewEncoder(w) // инициализируем JSON-encoder
 	// в зависимости от типа данных поддерживаются разные методы вывода
-	switch data := data.(type) {
+	// для []byte и io.Reader отдаем все как есть, а для остальных типов данных формируем ответ
+	// в формате JSON
+	switch d := data.(type) {
 	case nil: // нечего отдавать
-		if c.status >= 400 { // если статус соответствует ошибке, то формируем текст с ее описанием
-			err = enc.Encode(message{c.status, http.StatusText(c.status)})
+		if c.status == 0 {
+			c.status = http.StatusNoContent
+		} else if c.status >= 400 {
+			// если статус соответствует ошибке, то формируем текст с ее описанием
+			return c.encode(&HTTPError{c.status, http.StatusText(c.status)})
 		}
-	case error: // ошибки возвращаем в виде специального JSON
-		err = enc.Encode(message{c.status, data.Error()})
+		return nil
+	case error:
+		if he, ok := d.(*HTTPError); ok {
+			if he.Code >= 200 && he.Code < 600 {
+				c.status = he.Code // если в ошибке есть статус, то устанавливаем именно его
+			} else {
+				c.status = http.StatusInternalServerError
+			}
+		} else if c.status == 0 { // если статус не установлен, то ориентируемся на тип ошибки
+			switch {
+			case os.IsNotExist(d):
+				c.status = http.StatusNotFound
+			case os.IsPermission(d):
+				c.status = http.StatusForbidden
+			default:
+				c.status = http.StatusInternalServerError
+			}
+		}
+		return c.encode(&HTTPError{c.status, d.Error()})
 	case string: // строки тоже возвращаем в виде специального JSON
-		err = enc.Encode(message{c.status, data})
+		return c.encode(&HTTPError{c.status, d})
 	case []byte: // уже готовый к отдаче набор данных
-		_, err = w.Write(data) // тоже отдаем как есть
+		c.SetHeader("Content-Length", strconv.Itoa(len(d)))
+		_, err := c.Write(d) // тоже отдаем как есть
+		return err
 	case io.Reader: // поток данных отдаем как есть
-		_, err = io.Copy(w, data)
-		if data, ok := data.(io.Closer); ok {
-			data.Close() // закрываем по окончании, раз поддерживается
+		// вычисляем размер данных и записываем их в заголовок
+		if seeker, ok := d.(io.Seeker); ok {
+			// переходим к концу потока и смотрим размер
+			size, err := seeker.Seek(0, os.SEEK_END)
+			if err != nil {
+				return err
+			}
+			// возвращаемся к началу потока
+			if _, err = seeker.Seek(0, os.SEEK_SET); err != nil {
+				return err
+			}
+			// устанавливаем размер ответа
+			c.SetHeader("Content-Length", strconv.FormatInt(size, 10))
 		}
+		_, err := io.Copy(c, d) // копируем данные в ответ
+		if closer, ok := d.(io.Closer); ok {
+			closer.Close() // закрываем по окончании, раз поддерживается
+		}
+		return err
 	default: // во всех остальных случаях отдаем JSON-представление
-		err = enc.Encode(data)
+		return c.encode(data)
 	}
-	return err
 }
 
-// message описывает формат возвращаемого ответа по умолчанию
-type message struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+// encode декодируем ответ в формат JSON и отдает его. Для кодирования используется пул с
+// внутренними буферами.
+func (c *Context) encode(data interface{}) error {
+	if err := c.coder.Encode(c, data); err != nil {
+		return err
+	}
+	return nil
 }
 
-// пулы контекстов и gzip-сжатия
-var (
-	contexts = sync.Pool{New: func() interface{} { return new(Context) }}
-	gzipPool = sync.Pool{New: func() interface{} { return new(gzip.Writer) }}
-)
+// пулы контекстов
+var contexts = sync.Pool{New: func() interface{} { return new(Context) }}

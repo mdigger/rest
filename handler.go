@@ -1,133 +1,73 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
-// Handler является любая функция, которая принимает Context.
-type Handler func(*Context)
-
-// Methods описывает список Handler, ассоциированные с HTTP-методами.
-type Methods map[string]Handler
-
-// Paths позволяет описать сразу несколько обработчиков для разных путей и методов: ключем для
-// данного словаря как раз являются пути запросов. Используется в качестве аргумента при вызове
-// метода ServeMux.Handles.
-type Paths map[string]Methods
-
-// ServeMux описывает список обработчиков, ассоциированных с путями запроса и методами.
+// Handler является любая функция, которая принимает Context. Если в результате возвращается
+// ошибка и ответа от сервера еще не передавалось, то эта ошибка будет возвращена в качестве
+// ошибки сервера.
 //
-// Внутри используется достаточно простой и быстрый алгоритм выбора обработчиков, основанный
-// на количестве элементов пути (между разделителями '/'). К сожалению, данный алгоритм не
-// позволяет использовать catch-all ('*') параметры и использовать вложенные мультиплексоры:
-// они просто не будут корректно работать.
+// Функция автоматически отслеживает типы ошибок и для некоторых из них может изменять статус
+// возврата ответа. В частности, если ошибка соответствует os.IsNotExist, то вернется 404 ошибка.
+// А если соответствует os.IsPermission, то — 403.
 //
-// Еще одним ограничением является количество элементов пути: на текущий момент поддерживается
-// не более 255 таких элементов. Если в пути встретится большее количество элементов, то при
-// добавлении такого пути будет вызвана panic.
-type ServeMux struct {
-	// позволяет задать базовый путь для всех запросов
-	// данный путь "отрезается" и не используется при вычислении обработчика
-	BasePath string
-	// Глобальный обработчик, вызываемый перед всеми заданными обработчиками,
-	// если определен.
-	Middleware func(Handler) Handler
-	router     // обработчики запросов по путям, без учета метода запроса
+// Если Handler используется совместно с ServeMux, то вы можете самостоятельно переопределить
+// коды возврата для ошибок, задав функцию ServeMux.Errors.
+type Handler func(*Context) error
+
+// ServeHTTP поддерживает интерфейс http.Handler для Handler, что позволяет использовать его
+// с любыми совместимыми с http.Handler библиотеками.
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	context := newContext(w, r)        // инициализируем новый контекст запроса
+	context.coder = defaultCoder       // используем кодировщик по умолчанию
+	if err := h(context); err != nil { // выполняем обработчик
+		context.Send(err) // пытаемся отослать ошибку, если еще ничего не отдавали
+	}
+	context.close() // освобождаем контекст запроса и помещаем его обратно в пул
 }
 
-// Handles добавляет определение обработчиков сразу для всех методов для указанного пути, что
-// иногда является достаточно удобным вариантом.
-func (m *ServeMux) Handles(paths Paths) {
-	for path, methods := range paths {
-		if len(methods) > 0 {
-			if err := m.router.add(path, methods); err != nil {
-				panic(err)
+// handler приводит разные виды обработчиков к интерфейсу Handler.
+func handler(handlr interface{}) Handler {
+	switch h := handlr.(type) {
+	case Handler: // приводить тип не требуется
+		return h
+	case http.HandlerFunc: // стандартную http-функцию оборачиваем в простой обработчик
+		return func(c *Context) error {
+			c.sended = true // мы не управляем отдачей содержимого ответа
+			// т.к. стандартные обработчики не могут получить доступ к именованным параметрам пути,
+			// то добавляем их как именованные параметры в запрос
+			if len(c.Params) > 0 {
+				urlQuery := make(url.Values, len(c.Params))
+				for _, param := range c.Params {
+					urlQuery.Add(param.Key, param.Value)
+				}
+				p := urlQuery.Encode()
+				if c.Request.URL.RawQuery != "" {
+					p += "&" + c.Request.URL.RawQuery
+				}
+				c.Request.URL.RawQuery = p
+			}
+			h(c, c.Request) // вызываем функцию, передав ей запрос и ответ
+			return nil      // возвращаем, что ошибок нет
+		}
+	case http.Handler: // стандартный обработчик используем как простую http-функцию
+		return handler(h.ServeHTTP) // сводим задачу к вышеуказанной
+	default: // не поддерживаемый тип обработчика
+		panic(fmt.Errorf("unsupported Handler type %T", handlr))
+	}
+}
+
+// Handlers объединяет несколько обработчиков Handler в очередь.
+func Handlers(handlers ...interface{}) Handler {
+	return func(c *Context) error {
+		for _, h := range handlers {
+			if err := handler(h)(c); err != nil {
+				return err
 			}
 		}
+		return nil
 	}
-}
-
-// Handle добавляет новый обработчик для указанного пути и метода запроса. При задании пути
-// можно использовать именованные параметры (начинаются с символа ':'). В дальнейшем, можно
-// будет получить значения этих параметров, спросив их по имени через метод Context.Get("name").
-func (m *ServeMux) Handle(method, path string, handler Handler) {
-	if method == "" || handler == nil {
-		return
-	}
-	method = strings.ToUpper(method) // хочу быть уверенным
-	// предполагаем, что обработчик для данного пути уже есть
-	if route, _ := m.router.lookup(path); route != nil {
-		// в роутере хранятся обработчики с привязкой к методам
-		route.(Methods)[method] = handler // добавляем новый обработчик пути для данного метода
-		return
-	}
-	// обработчик для данного пути не определен
-	m.Handles(Paths{path: Methods{method: handler}})
-}
-
-// Handler позволяет привязать к нашему описанию стандартный обработчик http.Handler.
-//
-// Т.к. стандартные обработчики не имеют доступа к Context, то, соответственно, они не могут
-// получить доступ и к именованным параметрам пути. Для того, чтобы хоть как-то облегчить
-// работу, такие параметры будут добавлены к URL в виде именованных параметров, так что с ними
-// можно будет работать через http.Request.URL.Query().Get("name").
-func (m *ServeMux) Handler(method, path string, handler http.Handler) {
-	m.Handle(method, path, func(c *Context) {
-		if len(c.Params) > 0 {
-			urlQuery := make(url.Values, len(c.Params))
-			for _, param := range c.Params {
-				urlQuery.Add(param.Key, param.Value)
-			}
-			p := urlQuery.Encode()
-			if c.Request.URL.RawQuery != "" {
-				p += "&" + c.Request.URL.RawQuery
-			}
-			c.Request.URL.RawQuery = p
-		}
-		handler.ServeHTTP(c.response, c.Request)
-	})
-}
-
-// ServeHTTP обеспечивает поддержку интерфейса http.Handler и обрабатывает основной запрос.
-func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	context := newContext(w, req) // формируем контекст для ответа
-	defer context.free()          // освобождаем по окончании
-	// если установлен базовый путь, то отрезаем его
-	if m.BasePath != "" {
-		p := strings.TrimPrefix(context.Request.URL.Path, m.BasePath)
-		if len(p) == len(context.Request.URL.Path) {
-			context.Status(http.StatusNotFound).Send(nil)
-			return
-		}
-		context.Request.URL.Path = p
-	}
-	// получаем обработчик для указанного пути
-	route, params := m.router.lookup(context.Request.URL.Path)
-	context.Params = append(context.Params, params...)
-	if route == nil {
-		// при статусе больше 399 пустой body формирует JSON с описанием ошибки автоматически
-		context.Status(http.StatusNotFound).Send(nil)
-		return
-	}
-	methods, ok := route.(Methods) // приводим список методов
-	if !ok || len(methods) == 0 {  // если методы не определены, то лучше вернем, что путь не найден
-		context.Status(http.StatusNotFound).Send(nil)
-		return
-	}
-	handler := methods[strings.ToUpper(context.Request.Method)] // запрашиваем обработчик для метода
-	if handler == nil {                                         // обработчик для данного метода не определен
-		allows := make([]string, 0, len(methods)) // формируем список поддерживаемых методов
-		for method := range methods {
-			allows = append(allows, method)
-		}
-		context.SetHeader("Allow", strings.Join(allows, ", "))
-		context.Status(http.StatusMethodNotAllowed).Send(nil)
-		return
-	}
-	if m.Middleware != nil { // если промежуточный обработчик определен, то вызываем его
-		handler = m.Middleware(handler)
-	}
-	handler(context) // вызываем обработчик запроса
 }

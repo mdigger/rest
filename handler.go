@@ -34,6 +34,8 @@ func handler(handlr interface{}) Handler {
 	switch h := handlr.(type) {
 	case Handler: // приводить тип не требуется
 		return h
+	case func(*Context) error:
+		return handler(Handler(h))
 	case http.HandlerFunc: // стандартную http-функцию оборачиваем в простой обработчик
 		return func(c *Context) error {
 			c.sended = true // мы не управляем отдачей содержимого ответа
@@ -53,6 +55,8 @@ func handler(handlr interface{}) Handler {
 			h(c, c.Request) // вызываем функцию, передав ей запрос и ответ
 			return nil      // возвращаем, что ошибок нет
 		}
+	case func() http.Handler:
+		return handler(h())
 	case http.Handler: // стандартный обработчик используем как простую http-функцию
 		return handler(h.ServeHTTP) // сводим задачу к вышеуказанной
 	default: // не поддерживаемый тип обработчика

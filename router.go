@@ -142,10 +142,9 @@ func (r *router) lookup(url string) (interface{}, []Param) {
 		if len(records) == 0 {
 			continue // обработчики для такого пути не зарегистрированы
 		}
-		catchOnlyAll := l < length // флаг, что ищем только пути со "звездочкой" на конце
 	nextRecord:
 		for _, record := range records { // перебираем все записи с обработчиками
-			if catchOnlyAll && (record.params^(1<<15) != 1<<15) {
+			if l < length && record.params>>15 != 1 {
 				continue // игнорируем, если последний параметр не со звездочкой
 			}
 			var params []Param // сбрасываем предыдущие значения, если они были

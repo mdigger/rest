@@ -85,6 +85,10 @@ func TestOnlyStaticRouter(t *testing.T) {
 func TestRouterSort(t *testing.T) {
 	var r router
 	var urls = []string{
+		"/1/2/*3/",
+		"/1/:2/*3/",
+		"/:1/2/*3/",
+		"/:1/:2/*3/",
 		"/1/2/3/",
 		"/:1/2/3/",
 		"/1/:2/3/",
@@ -92,10 +96,6 @@ func TestRouterSort(t *testing.T) {
 		"/:1/:2/3/",
 		"/:1/2/:3/",
 		"/1/:2/:3/",
-		"/1/2/*3/",
-		"/1/:2/*3/",
-		"/:1/2/*3/",
-		"/:1/:2/*3/",
 	}
 	for _, url := range urls {
 		if err := r.add(url, url); err != nil {
@@ -103,4 +103,23 @@ func TestRouterSort(t *testing.T) {
 		}
 	}
 	pretty.Println(r)
+}
+
+func TestRouterBad(t *testing.T) {
+	var r router
+	if err := r.add("/*test/:test", "bad"); err == nil {
+		t.Error("bad * param in path")
+	}
+	if h, _ := r.lookup("/1/2/3/4/5/"); h != nil {
+		t.Error("bad handler")
+	}
+	if err := r.add(strings.Repeat("/:test", 1<<15+1), "bad long"); err == nil {
+		t.Error("bad long handler")
+	}
+	if err := r.add("/:test/:test", "bad"); err != nil {
+		t.Error(err)
+	}
+	if h, _ := r.lookup("/1/2/3/4/5/"); h != nil {
+		t.Error("bad handler")
+	}
 }

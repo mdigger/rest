@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/kr/pretty"
 )
 
 var urls = []string{
@@ -15,6 +17,8 @@ var urls = []string{
 	"/user/:vova/param3",
 	"/user/:id/param2",
 	"/user",
+	"/user/*test",
+	"/user/:id/*param2",
 }
 
 func TestSplit(t *testing.T) {
@@ -34,6 +38,7 @@ func TestRouter(t *testing.T) {
 			t.Error(err)
 		}
 	}
+	pretty.Println(r)
 	for _, url := range urls {
 		handler, params := r.lookup(url)
 		if handler == nil {
@@ -50,19 +55,6 @@ func TestRouter(t *testing.T) {
 	handler, params = r.lookup("/user/test/mama/1/2/3/4/5/6/7/8/9/0/")
 	if handler != nil {
 		t.Error("Bad handler:", url)
-	}
-}
-
-func TestLongRouter(t *testing.T) {
-	var r router
-	url := `1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/` +
-		`1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/` +
-		`1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/` +
-		`1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/` +
-		`1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/` +
-		`1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/1/2/3/4/5/6/7/8/9/0/`
-	if err := r.add(url, "long"); err == nil {
-		t.Error("must be error")
 	}
 }
 
@@ -100,10 +92,15 @@ func TestRouterSort(t *testing.T) {
 		"/:1/:2/3/",
 		"/:1/2/:3/",
 		"/1/:2/:3/",
+		"/1/2/*3/",
+		"/1/:2/*3/",
+		"/:1/2/*3/",
+		"/:1/:2/*3/",
 	}
 	for _, url := range urls {
-		if err := r.add(url, "long"); err != nil {
+		if err := r.add(url, url); err != nil {
 			t.Error(err)
 		}
 	}
+	pretty.Println(r)
 }

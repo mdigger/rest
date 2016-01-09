@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -28,14 +29,14 @@ type Param struct {
 // с меньшим количеством параметров имеют более высокий приоритет и после сортировки будут
 // обрабатывается позже, чем элементы с меньшим количеством параметров.
 //
-// Текущая реализация имеет ограничение на максимальное количество элементов пути — 255.
+// Текущая реализация имеет ограничение на максимальное количество элементов пути — 32767.
 // Это связано с методом хранения этого значения в свойстве priority. В принципе, ничего не мешает
 // просто увеличить размер priority до uint32 и поправить соответствующие места, где он определен,
 // но мне показалось, что для моих задач этого более, чем достаточно.
 type record struct {
-	priority uint16      // приоритетность обработчика
-	handle   interface{} // обработчик запроса
-	parts    []string    // путь, разобранный на составные части
+	params uint16      // количество параметров в пути
+	handle interface{} // обработчик запроса
+	parts  []string    // путь, разобранный на составные части
 }
 
 // records описывает список путей с параметрами и поддерживает сортировку по флагу приоритета.
@@ -44,11 +45,10 @@ type records []*record
 // поддержка методов для сортировки.
 func (n records) Len() int           { return len(n) }
 func (n records) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
-func (n records) Less(i, j int) bool { return n[i].priority < n[j].priority }
+func (n records) Less(i, j int) bool { return n[i].params < n[j].params }
 
 // router описывает структуру для быстрого выбора обработчиков по пути запроса.
-// Поддерживает как статические пути, так и пути с параметрами. Но не поддерживает catch-all
-// параметры.
+// Поддерживает как статические пути, так и пути с параметрами.
 //
 // Текущая реализация не привязана к конкретным типам обработчиков и может хранить любые
 // объекты в качестве таких обработчиков.
@@ -58,27 +58,35 @@ type router struct {
 	static map[string]interface{}
 	// хранит информацию о путях с параметрами
 	// в качестве ключа используется общее количество элементов пути
-	fields map[uint8]records
+	fields   map[uint16]records
+	maxParts uint16 // максимальное количество частей пути в определениях
 }
 
 // add добавляет описание нового пути запроса и ассоциирует его с указанным обработчиком запроса.
-// Возвращает ошибку, если количество частей пути больше 255. В качестве флага для определения
-// именованных параметров используется символ ParamFlag.
-//
-// Текущая реализация ограничена только именованными параметрами и не поддерживает catch-all
-// параметры со звездочками. Это сделано принципиально, чтобы упростить реализацию алгоритма
-// подбора и максимально его ускорить.
+// Возвращает ошибку, если количество частей пути больше 32767. В качестве флага для определения
+// именованных параметров используется символ ':' и '*' для завершающего параметра, который
+// "забирает" в себя весь оставшийся путь.
 func (r *router) add(url string, handle interface{}) error {
 	parts := split(url) // нормализуем путь и разбиваем его на части
 	// проверяем, что количество получившихся частей не превышает поддерживаемое количество.
-	if len(parts) > (1<<8 - 1) {
+	length := len(parts)
+	if length > (1<<15 - 1) {
 		return fmt.Errorf("path parts overflow: %d", len(parts))
 	}
-	var dynamic uint8 // считаем количество параметров
-	for _, value := range parts {
-		if len(value) > 0 && value[0] == paramFlag {
+	var dynamic uint16 // считаем количество параметров
+	for i, value := range parts {
+		// if len(value) > 0 { после нормализации пути не должно быть пустых элементов
+		switch value[0] {
+		case byte('*'):
+			if i != length-1 {
+				return errors.New("catch-all parameter must be last")
+			}
+			dynamic |= 1 << 15 // взводим флаг *-параметра
+			fallthrough
+		case byte(':'):
 			dynamic++ // увеличиваем счетчик параметров
 		}
+		// }
 	}
 	if dynamic == 0 { // в пути нет параметров — добавляем в статические обработчики
 		if r.static == nil {
@@ -88,17 +96,19 @@ func (r *router) add(url string, handle interface{}) error {
 		r.static[strings.Join(parts, "/")] = handle
 		return nil
 	}
+	level := uint16(length) // всего элементов пути
+	if r.maxParts < level { // запоминаем максимальное количество определенных параметров
+		r.maxParts = level
+	}
 	if r.fields == nil {
 		// инициализируем динамические пути, если не сделали этого раньше
-		r.fields = make(map[uint8]records)
+		r.fields = make(map[uint16]records)
 	}
-	level := uint8(len(parts)) // всего элементов пути
 	// в пути есть динамические параметры — добавляем в список с параметрами
 	record := &record{
-		// в старших битах количество динамических, в младших — статических
-		priority: uint16(dynamic<<8 + (level - dynamic)),
-		handle:   handle, // обработчик запроса
-		parts:    parts,  // части пути
+		params: dynamic,
+		handle: handle, // обработчик запроса
+		parts:  parts,  // части пути
 	}
 	// сохраняем в массиве обработчиков с таким же количеством параметров
 	r.fields[level] = append(r.fields[level], record)
@@ -119,26 +129,50 @@ func (r *router) lookup(url string) (interface{}, []Param) {
 	if r.fields == nil { // если пути с параметрами не определены, то пропускаем проверку
 		return nil, nil
 	}
-	// запрашиваем список обработчиков для такого же количества элементов пути
-	records := r.fields[uint8(len(parts))]
-	if len(records) == 0 {
-		return nil, nil // обработчики для такого пути не зарегистрированы
+	length := uint16(len(parts))
+	var total uint16
+	if length > r.maxParts {
+		total = r.maxParts
+	} else {
+		total = length
 	}
-next:
-	for _, record := range records { // перебираем все записи с обработчиками
-		var params []Param                  // сбрасываем предыдущие значения, если они были
-		for i, part := range record.parts { // перебираем все части пути, заданные в обработчике
-			if len(part) > 0 && part[0] == paramFlag { // это параметр
-				// добавляем в список именованных параметров его имя и значение
-				// из имени убираем символ параметра
-				params = append(params, Param{Key: part[1:], Value: parts[i]})
-				continue // переходим к следующему элементу пути
-			}
-			if part != parts[i] { // статическая часть пути не совпадает с запрашиваемой
-				continue next // переходим к следующему обработчику
-			}
+	// запрашиваем список обработчиков для такого же количества элементов пути
+	for l := total; l > 0; l-- {
+		records := r.fields[l]
+		if len(records) == 0 {
+			continue // обработчики для такого пути не зарегистрированы
 		}
-		return record.handle, params // возвращаем обработчик и параметры
+		catchOnlyAll := l < length // флаг, что ищем только пути со "звездочкой" на конце
+	nextRecord:
+		for _, record := range records { // перебираем все записи с обработчиками
+			if catchOnlyAll && (record.params^(1<<15) != 1<<15) {
+				continue // игнорируем, если последний параметр не со звездочкой
+			}
+			var params []Param // сбрасываем предыдущие значения, если они были
+		params:
+			for i, part := range record.parts { // перебираем все части пути, заданные в обработчике
+				// if len(part) > 0 { // это параметр?
+				switch part[0] {
+				case byte('*'):
+					params = append(params, Param{
+						Key:   part[1:],
+						Value: strings.Join(parts[i:], "/"),
+					})
+					break params //
+				case byte(':'):
+					params = append(params, Param{
+						Key:   part[1:],
+						Value: parts[i],
+					})
+					continue // переходим к следующему элементу пути
+				}
+				// }
+				if part != parts[i] { // статическая часть пути не совпадает с запрашиваемой
+					continue nextRecord // переходим к следующему обработчику
+				}
+			}
+			return record.handle, params // возвращаем обработчик и параметры
+		}
 	}
 	return nil, nil // ничего подходящего не нашли
 }

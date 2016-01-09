@@ -7,14 +7,15 @@ import "net/http"
 // HTTP, сформированное на базе этой ошибки.
 var Debug = false
 
-// HTTPError описывает возвращаемую по HTTP ошибку, для которой определен статус.
+// HTTPError описывает возвращаемую по HTTP ошибку, для которой определен статус возврата HTTP.
 type HTTPError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
 // NewHTTPError возвращает ошибку с указанным кодом окончания запроса. Это ошибку можно вернуть
-// в качестве ошибки выполнения обработки в Context.
+// в качестве ошибки выполнения обработки в Context. Но если вы хотите сохранить и сам текст
+// ошибки, то лучше использовать инициализацию объекта через &HTTPError.
 func NewHTTPError(code int) *HTTPError {
 	if code < 200 || code >= 600 {
 		code = http.StatusInternalServerError

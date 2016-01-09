@@ -8,8 +8,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/kr/pretty"
 )
 
 func TestContext(t *testing.T) {
@@ -40,8 +38,7 @@ func TestContext(t *testing.T) {
 	}
 	c.ContentType = "application/json; encoding=utf-8"
 	if err := c.Status(200).Send(data); err != nil {
-		pretty.Println(err)
-		t.Error("Error:", err)
+		t.Error(err)
 	}
 	if c.Error(404) == nil {
 		t.Error("bad error generation")

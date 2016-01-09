@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mdigger/rest2"
+	"github.com/mdigger/rest"
 )
 
 func Example() {

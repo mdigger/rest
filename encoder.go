@@ -38,33 +38,41 @@ type JSONCoder struct {
 	MaxBodyBytes int64 // максимально допустимый размер данных в запросе
 }
 
-// Encode отдает data в формате JSON. Для кодирования используется внутренний буфер, выбираемый
-// из пула буферов. Если `Content-Type` не установлен, то устанавливает его как
-// `application/json; charset=utf-8`. Так же устанавливает размер данных.
+// Encode отдает data в формате JSON. Для кодирования используется внутренний
+// буфер, выбираемый из пула буферов. Если `Content-Type` не установлен, то
+// устанавливает его как `application/json; charset=utf-8`. Так же устанавливает
+// размер данных.
 func (JSONCoder) Encode(c *Context, data interface{}) *HTTPError {
 	buf := buffers.Get().(*bytes.Buffer) // получаем буфер из пула
 	defer buffers.Put(buf)               // возвращаем в пул по окончании
 	buf.Reset()                          // сбрасываем предыдущие состояния
 	// декодируем объект в формат JSON используя буфер
 	if err := json.NewEncoder(buf).Encode(data); err != nil {
-		return &HTTPError{Code: http.StatusInternalServerError, Message: err.Error()}
+		return &HTTPError{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		}
 	}
 	if c.Header().Get("ContentType") == "" {
 		c.SetHeader("Content-Type", "application/json; charset=utf-8")
 	}
 	c.SetHeader("Content-Length", strconv.Itoa(buf.Len()))
 	if _, err := buf.WriteTo(c); err != nil { // отдаем сформированный ответ
-		return &HTTPError{Code: http.StatusInternalServerError, Message: err.Error()}
+		return &HTTPError{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		}
 	}
 	return nil
 }
 
-// Decoder декодирует содержимое запроса в формате JSON в объект. Перед декодированием
-// проверяется, что данные представлены в формате JSON и не превышают максимально допустимый
-// размер, задаваемый в MaxBodyBytes.
+// Decoder декодирует содержимое запроса в формате JSON в объект. Перед
+// декодированием проверяется, что данные представлены в формате JSON и не
+// превышают максимально допустимый размер, задаваемый в MaxBodyBytes.
 func (j JSONCoder) Decode(c *Context, data interface{}) *HTTPError {
 	// разбираем заголовок с типом информации в запросе
-	mediatype, params, _ := mime.ParseMediaType(c.Request.Header.Get("Content-Type"))
+	mediatype, params, _ := mime.ParseMediaType(
+		c.Request.Header.Get("Content-Type"))
 	charset, ok := params["charset"]
 	if !ok {
 		charset = "UTF-8"

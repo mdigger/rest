@@ -36,8 +36,8 @@ func StaticData(data interface{}, contentType string) Handler {
 	}
 }
 
-// ServeFile отдает статический файл в ответ на запрос. Если файл с таким именем не найден, то
-// отдается ошибка.
+// ServeFile отдает статический файл в ответ на запрос. Если файл с таким именем
+// не найден, то отдается ошибка.
 func ServeFile(filename string) Handler {
 	fi, err := os.Stat(filename) // проверяем, что файл существует и доступен
 	if err == nil && fi.IsDir() {

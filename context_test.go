@@ -146,3 +146,126 @@ func TestContext4(t *testing.T) {
 	fmt.Println(string(dump))
 	fmt.Println(strings.Repeat("-", 40))
 }
+
+func TestContextReader(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	file, err := os.Open("context_test.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Send(file); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestContextNil(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	if err := c.Send(nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestContextErrorNotExists(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	if err := c.Send(os.ErrNotExist); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestContextErrorPermission(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	if err := c.Send(os.ErrPermission); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestContextError(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	if err := c.Send(os.ErrInvalid); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestContextHTTPError(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	if err := c.Send(&HTTPError{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestContext404Nil(t *testing.T) {
+	body := strings.NewReader(`{"key":"value"}`)
+	r, err := http.NewRequest("POST", "http://example.com/foo?param=name", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	defer c.close()
+
+	if err := c.Status(404).Send(nil); err != nil {
+		t.Fatal(err)
+	}
+}

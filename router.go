@@ -61,6 +61,7 @@ type router struct {
 	// в качестве ключа используется общее количество элементов пути
 	fields   map[uint16]records
 	maxParts uint16 // максимальное количество частей пути в определениях
+	dynamic  uint16 // самый ранний динамический параметр
 }
 
 // add добавляет описание нового пути запроса и ассоциирует его с указанным
@@ -85,7 +86,10 @@ func (r *router) add(url string, handle interface{}) error {
 				return errors.New("catch-all parameter must be last")
 			}
 			dynamic |= 1 << 15 // взводим флаг *-параметра
-			fallthrough
+			if r.dynamic == 0 || r.dynamic > uint16(i+1) {
+				// есть динамический параметр — сохраняем его позицию
+				r.dynamic = uint16(i + 1)
+			}
 		case byte(':'):
 			dynamic++ // увеличиваем счетчик параметров
 		}
@@ -140,12 +144,20 @@ func (r *router) lookup(url string) (interface{}, []Param) {
 	length := uint16(len(parts))
 	var total uint16
 	if length > r.maxParts {
+		// если нет динамических параметров, то ничего и не подойдет
+		if r.dynamic == 0 {
+			return nil, nil
+		}
 		total = r.maxParts
 	} else {
 		total = length
 	}
 	// запрашиваем список обработчиков для такого же количества элементов пути
 	for l := total; l > 0; l-- {
+		if l < r.dynamic {
+			// больше нет динамических параметров дальше
+			break
+		}
 		records := r.fields[l]
 		if len(records) == 0 {
 			continue // обработчики для такого пути не зарегистрированы

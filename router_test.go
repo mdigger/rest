@@ -123,3 +123,31 @@ func TestRouterBad(t *testing.T) {
 		t.Error("bad handler")
 	}
 }
+
+func TestRouterDynamic(t *testing.T) {
+	var r router
+	var urls = []string{
+		"/1/2/*3/",
+		"/1/:2/*3/",
+		"/:1/2/*3/",
+		"/1/2/3/",
+		"/:1/2/3/",
+		"/1/:2/3/",
+		"/1/2/:3/",
+		"/:1/:2/3/",
+		"/:1/2/:3/",
+		"/1/:2/:3/",
+		// "/1/*2/",
+	}
+	for _, url := range urls {
+		if err := r.add(url, url); err != nil {
+			t.Error(err)
+		}
+	}
+	pretty.Println(r)
+	pretty.Println(r.lookup("/1/2/3/4/5/6"))
+	pretty.Println(r.lookup("/1/2/3/4/5"))
+	pretty.Println(r.lookup("/1/2/3/"))
+	pretty.Println(r.lookup("/1/2/"))
+	pretty.Println(r.lookup("/1/"))
+}

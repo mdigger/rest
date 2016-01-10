@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/geotrace/rest"
 )
-
-var c = new(rest.Context) // test context
 
 func Example() {
 	var mux rest.ServeMux // инициализируем обработчик запросов
@@ -16,55 +15,63 @@ func Example() {
 	mux.Handles(rest.Paths{
 		// при задании путей можно использовать именованные параметры с ':'
 		"/user/:id": {
-			"GET": func(c *rest.Context) {
+			"GET": func(c *rest.Context) error {
 				// можно быстро сформировать ответ в JSON
-				c.Send(rest.JSON{"user": c.Get("id")})
+				return c.Send(rest.JSON{"user": c.Param("id")})
 			},
 			// для одного пути можно сразу задать все обработчики для разных методов
-			"POST": func(c *rest.Context) {
+			"POST": func(c *rest.Context) error {
 				var data = make(rest.JSON)
 				// можно быстро десериализовать JSON, переданный в запросе, в объект
 				if err := c.Parse(&data); err != nil {
 					// возвращать ошибки тоже удобно
-					c.Status(500).Send(err)
-					return
+					return err
 				}
-				c.Send(rest.JSON{"user": c.Get("id"), "data": data})
+				return c.Send(rest.JSON{"user": c.Param("id"), "data": data})
 			},
 		},
 		// можно одновременно описать сразу несколько путей в одном месте
 		"/message/:text": {
-			"GET": func(c *rest.Context) {
+			"GET": func(c *rest.Context) error {
 				// параметры пути получаются простым запросом
-				c.Send(rest.JSON{"message": c.Get("text")})
+				return c.Send(rest.JSON{"message": c.Param("text")})
 			},
 		},
 		"/file/:name": {
-			"GET": func(c *rest.Context) {
+			"GET": func(c *rest.Context) error {
 				// поддерживает отдачу разного типа данных, в том числе и файлов
-				file, err := os.Open(c.Get("name") + ".html")
+				file, err := os.Open(c.Param("name") + ".html")
 				if err != nil {
-					c.Status(404).Send(nil)
-					return
+					return err
 				}
 				// можно получать не только именованные элементы пути, но
 				// параметры, используемые в запросе
-				if c.Get("format") == "raw" {
-					c.ContentType = `text; charset="utf-8"`
+				if c.Param("format") == "raw" {
+					c.ContentType = `text/plain; charset="utf-8"`
 				} else {
 					c.ContentType = `text/html; charset="utf-8"`
 				}
-				c.Send(file) // отдаем содержимое файла
+				return c.Send(file) // отдаем содержимое файла
 				// закрытие файла произойдет автоматически
 			},
+		},
+		"/favicon.ico": {
+			// для работы со статическими файлами определена специальная функция
+			"GET": rest.ServeFile("./favicon.ico"),
 		},
 	})
 	// можно сразу задать базовый путь для всех URL, используемых в обработчиках
 	mux.BasePath = "/api/v1"
+	// можно задать глобальные заголовки для всех ответов
+	mux.Headers = map[string]string{
+		"X-Powered-By": "My Server",
+	}
 	// т.к. поддерживается интерфейс http.Handler, то можно использовать
 	// с любыми стандартными библиотеками http
 	http.ListenAndServe(":8080", mux)
 }
+
+var c = new(rest.Context) // test context
 
 func ExampleContext_SetData() {
 	type myKeyType byte     // определяем собственный тип данных
@@ -77,54 +84,102 @@ func ExampleContext_SetData() {
 	// Output: Test data
 }
 
-func ExampleContext_Send_file() {
+func ExampleContext_Error() error {
+	return c.Error(404)
+}
+
+func ExampleContext_Send_json() error {
+	// отдаем ответ в формате JSON, беря идентификатор пользователя
+	// из параметров пути или запроса
+	return c.Send(rest.JSON{"user": c.Param("id")})
+}
+
+func ExampleContext_Send_file() error {
 	// открываем файл
 	file, err := os.Open("README.md")
 	if err != nil {
-		c.Status(500).Send(err)
-		return
+		return err
 	}
+	// закрытие файла не обязательно, т.к. метод Send автоматически
+	// закроет его, если поддерживается интрефейс io.ReadCloser
+	defer file.Close()
 	// устанавливаем тип отдаваемых данных
 	c.ContentType = "text/markdown; charset=UTF-8"
 	// отдаем содержимое файла в качестве ответа
-	c.Send(file)
-	// закрытие файла не обязательно, т.к. метод Send автоматически
-	// закроет его, если поддерживается интрефейс io.ReadCloser
-	file.Close()
+	return c.Send(file)
 }
 
-func ExampleContext_Status() {
-	// возвращаем 404 ошибку
-	c.Status(404).Send(nil)
+func ExampleContext_Status() error {
+	// возвращаем 201 код окончания
+	return c.Status(201).Send(nil)
 }
 
-func ExampleContext_Parse() {
+func ExampleContext_Parse() error {
 	// инициализируем формат данных для разбора
-	obj := make(map[string]interface{})
+	data := make(map[string]interface{})
 	// читаем запрос и получаем данные в разобранном виде
-	if err := c.Parse(&obj); err != nil {
-		panic(err)
+	if err := c.Parse(&data); err != nil {
+		return err
 	}
+	// возвращаем эти же данные в ответ
+	return c.Send(data)
 }
 
-func ExampleContext_SetHeader() {
-	c.SetHeader("ETag", "ab0138")
-	c.SetHeader("Location", "/user/43952945")
+func ExampleContext_Header() {
+	c.SetHeader("ETag", "ab0138").SetHeader("Location", "/user/43952945")
+}
+
+var mux rest.ServeMux
+
+func ExampleHandler_ServeHTTP() {
+	http.ListenAndServe(":8080",
+		rest.Handler(func(c *rest.Context) error {
+			return c.Send(rest.JSON{
+				"user": "name",
+				"date": time.Now().UTC(),
+			})
+		}))
 }
 
 func ExampleServeMux_Handle() {
-	var mux rest.ServeMux
-	mux.Handle("GET", "/message/:text", func(c *rest.Context) {
-		c.Send(rest.JSON{"message": c.Get("text")})
-	})
+	mux.Handle("GET", "/json/",
+		func(c *rest.Context) error {
+			return c.Send(rest.JSON{
+				"user": "name",
+				"date": time.Now().UTC(),
+			})
+		})
 }
 
-func ExampleServeMux_Handler() {
-	var mux rest.ServeMux
-	// в качестве обработчиков можно использовать стандартные обработчики http
-	mux.Handler("GET", "/files/:filename",
-		http.StripPrefix("/files/", http.FileServer(http.Dir("/tmp"))))
+func ExampleServeMux_ServeHTTP() {
+	mux.Handles(rest.Paths{
+		"/user/:id": {
+			"GET": func(c *rest.Context) error {
+				return c.Send(rest.JSON{
+					"user": c.Param("id"),
+					"date": time.Now().UTC(),
+				})
+			},
+			"POST": rest.StaticData("OK", ""),
+		},
+		"/favicon.ico": {
+			"GET": rest.ServeFile("./favicon.ico"),
+		},
+	})
+	http.ListenAndServe(":8080", mux)
 }
+
+type User struct{}
+
+func (User) get(*rest.Context)           {}
+func (User) post(*rest.Context)          {}
+func secure(h rest.Handler) rest.Handler { return h }
+
+var (
+	user       User
+	getMessage = func(*rest.Context) error { return nil }
+	getFile    = getMessage
+)
 
 func ExampleServeMux_Handles() {
 	var mux rest.ServeMux
@@ -136,26 +191,38 @@ func ExampleServeMux_Handles() {
 		"/message/:text": {"GET": getMessage},
 		"/file/:name":    {"GET": secure(getFile)},
 	})
-}
-
-type User struct{}
-
-func (User) get(*rest.Context)           {}
-func (User) post(*rest.Context)          {}
-func secure(h rest.Handler) rest.Handler { return h }
-
-var (
-	user       User
-	getMessage = func(*rest.Context) {}
-	getFile    = getMessage
-)
-
-func ExampleServeMux_ServeHTTP() {
-	var mux rest.ServeMux
-	mux.Handle("GET", "/message/:text", func(c *rest.Context) {
-		c.Send(rest.JSON{"message": c.Get("text")})
-	})
 	// т.к. поддерживается интерфейс http.Handler, то можно использовать
 	// с любыми стандартными библиотеками
 	http.ListenAndServe(":8080", mux)
+}
+
+func ExampleError() {
+	mux.Handle("GET", "/server_error/",
+		rest.Error("no test", http.StatusInternalServerError))
+}
+
+func ExampleNotFound() {
+	mux.Handle("GET", "/not_found/", rest.NotFound())
+}
+
+func ExampleRedirect() {
+	mux.Handle("GET", "/redirect/",
+		rest.Redirect("/json/", http.StatusMovedPermanently))
+}
+
+func ExampleStatic() {
+	mux.Handle("GET", "/static/",
+		rest.StaticData("OK", ""))
+	mux.Handle("GET", "/bin/",
+		rest.StaticData([]byte{0x1, 0x2, 0x3, 0x4}, "application/binary"))
+}
+
+func ExampleServeFile() {
+	mux.Handle("GET", "/favicon.ico",
+		rest.ServeFile("./favicon.ico"))
+}
+
+func ExampleServeParamFile() {
+	mux.Handle("GET", "/files/:name",
+		rest.ServeParamFile("name", "./tmp/"))
 }

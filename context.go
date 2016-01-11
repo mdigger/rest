@@ -210,7 +210,11 @@ func (c *Context) SetData(key, value interface{}) {
 
 // Error отсылает в ответ ошибку с указанным статусом и кодом.
 func (c *Context) Error(code int, msg string) error {
-	return c.Status(code).Send(msg)
+	c.Status(code)
+	if msg == "" {
+		msg = http.StatusText(c.status)
+	}
+	return c.Send(msg)
 }
 
 // ErrDoubleSend возвращается Context.Send в случае повторной попытки послать
@@ -280,6 +284,9 @@ func (c *Context) Send(data interface{}) error {
 		}
 		return c.encode(NewError(c.status, ""))
 	case string: // строки тоже возвращаем в виде специального JSON
+		if d == "" {
+			d = http.StatusText(c.status)
+		}
 		return c.encode(NewError(c.status, d))
 	case []byte: // уже готовый к отдаче набор данных
 		c.SetHeader("Content-Length", strconv.Itoa(len(d)))

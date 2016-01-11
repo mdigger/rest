@@ -152,7 +152,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	// вызываем обработчик запроса
 	if err := handler(context); err != nil && !context.sended {
-		if m.Errors != nil { // преобразуем ошибку, если задан обработчик
+		if _, ok := err.(Error); !ok && m.Errors != nil { // преобразуем ошибку, если задан обработчик
 			err = m.Errors(err)
 		}
 		if err != nil { // если ошибка все еще есть, то отправляем ее в ответ

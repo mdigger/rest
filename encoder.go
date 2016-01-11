@@ -18,8 +18,8 @@ type JSON map[string]interface{}
 // запроса в 16 мегабайт. Вы можете задать свой кодировщик при инициализации
 // ServeMux.
 type Coder interface {
-	Decode(c *Context, data interface{}) *Error
-	Encode(c *Context, data interface{}) *Error
+	Decode(c *Context, data interface{}) error
+	Encode(c *Context, data interface{}) error
 }
 
 // defaultCoder содержит Coder по умолчанию: JSON с максимальным размером данных
@@ -42,20 +42,20 @@ type JSONCoder struct {
 // буфер, выбираемый из пула буферов. Если `Content-Type` не установлен, то
 // устанавливает его как `application/json; charset=utf-8`. Так же устанавливает
 // размер данных.
-func (JSONCoder) Encode(c *Context, data interface{}) *Error {
+func (JSONCoder) Encode(c *Context, data interface{}) error {
 	buf := buffers.Get().(*bytes.Buffer) // получаем буфер из пула
 	defer buffers.Put(buf)               // возвращаем в пул по окончании
 	buf.Reset()                          // сбрасываем предыдущие состояния
 	// декодируем объект в формат JSON используя буфер
 	if err := json.NewEncoder(buf).Encode(data); err != nil {
-		return NewError(http.StatusInternalServerError, err.Error())
+		return err
 	}
 	if c.Header().Get("ContentType") == "" {
 		c.SetHeader("Content-Type", "application/json; charset=utf-8")
 	}
 	c.SetHeader("Content-Length", strconv.Itoa(buf.Len()))
 	if _, err := buf.WriteTo(c); err != nil { // отдаем сформированный ответ
-		return NewError(http.StatusInternalServerError, err.Error())
+		return err
 	}
 	return nil
 }
@@ -63,7 +63,7 @@ func (JSONCoder) Encode(c *Context, data interface{}) *Error {
 // Decoder декодирует содержимое запроса в формате JSON в объект. Перед
 // декодированием проверяется, что данные представлены в формате JSON и не
 // превышают максимально допустимый размер, задаваемый в MaxBodyBytes.
-func (j JSONCoder) Decode(c *Context, data interface{}) *Error {
+func (j JSONCoder) Decode(c *Context, data interface{}) error {
 	// разбираем заголовок с типом информации в запросе
 	mediatype, params, _ := mime.ParseMediaType(
 		c.Request.Header.Get("Content-Type"))

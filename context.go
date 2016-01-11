@@ -161,7 +161,7 @@ func (c *Context) SetHeader(key, value string) *Context {
 // запроса ограничен размером MaxBytes, если установлен. Возвращает ошибку
 // Error, если данные не соответствуют формату JSON или не получается их
 // разобрать.
-func (c *Context) Parse(data interface{}) *Error {
+func (c *Context) Parse(data interface{}) error {
 	// декодируем запрос и возвращаем ошибку, если случилась
 	return c.coder.Decode(c, data)
 }

@@ -32,9 +32,8 @@ type ServeMux struct {
 	// Вы можете определить свою функцию, которая будет, в зависимости от
 	// ошибки, возвращать разные коды завершения запроса и текст, который будет
 	// возвращаться. Например, для всех ошибок mgo.ErrNotFound устанавливать код
-	// 404. Если же вы хотите игнорировать данную ошибку, то проще всего в этом
-	// случае вернуть nil.
-	Errors func(err error) *Error
+	// 404.
+	Errors func(err error) (status int, msg string)
 	// Кодировщик, используемый для декодирования запросов и кодирования ответов.
 	Coder  Coder
 	router // обработчики запросов по путям, без учета метода запроса
@@ -153,7 +152,8 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// вызываем обработчик запроса
 	if err := handler(context); err != nil && !context.sended {
 		if _, ok := err.(Error); !ok && m.Errors != nil { // преобразуем ошибку, если задан обработчик
-			err = m.Errors(err)
+			status, msg := m.Errors(err)
+			err = NewError(status, msg)
 		}
 		if err != nil { // если ошибка все еще есть, то отправляем ее в ответ
 			context.Send(err) // отдаем ошибку

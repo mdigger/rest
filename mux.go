@@ -103,7 +103,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// добавляем заголовки, если они определены
 	if len(m.Headers) > 0 {
 		for key, value := range m.Headers {
-			context.SetHeader(key, value)
+			context.HeaderSet(key, value)
 		}
 	}
 	// если установлен базовый путь, то отрезаем его
@@ -141,7 +141,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		for method := range methods {
 			allows = append(allows, method)
 		}
-		context.SetHeader("Allow", strings.Join(allows, ", ")).
+		context.HeaderSet("Allow", strings.Join(allows, ", ")).
 			Status(http.StatusMethodNotAllowed).Send(nil)
 		return
 	}
@@ -151,7 +151,9 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	// вызываем обработчик запроса
 	if err := handler(context); err != nil && !context.sended {
-		if _, ok := err.(Error); !ok && m.Errors != nil { // преобразуем ошибку, если задан обработчик
+		// преобразуем ошибку, если задан обработчик
+		// игнорируем ошибки уже в нашем формате со статусом
+		if _, ok := err.(Error); !ok && m.Errors != nil {
 			status, msg := m.Errors(err)
 			err = NewError(status, msg)
 		}

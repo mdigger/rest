@@ -51,9 +51,9 @@ func (JSONCoder) Encode(c *Context, data interface{}) error {
 		return err
 	}
 	if c.Header().Get("ContentType") == "" {
-		c.SetHeader("Content-Type", "application/json; charset=utf-8")
+		c.HeaderSet("Content-Type", "application/json; charset=utf-8")
 	}
-	c.SetHeader("Content-Length", strconv.Itoa(buf.Len()))
+	c.HeaderSet("Content-Length", strconv.Itoa(buf.Len()))
 	if _, err := buf.WriteTo(c); err != nil { // отдаем сформированный ответ
 		return err
 	}

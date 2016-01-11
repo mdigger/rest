@@ -28,7 +28,7 @@ func TestContext(t *testing.T) {
 	if c.Param("param") != r.URL.Query().Get("param") {
 		t.Error("bad param")
 	}
-	c.SetData("test", "test")
+	c.DataSet("test", "test")
 	if c.Data("test").(string) != "test" {
 		t.Error("bad set data")
 	}
@@ -55,7 +55,7 @@ func TestContext2(t *testing.T) {
 		}
 		// return c.Send(data)
 		c.ContentType = "text/plain"
-		c.SetHeader("X-Powered-By", "")
+		c.HeaderSet("X-Powered-By", "")
 		err := c.Send("OK")
 		c.Flush()
 		c.Send("OK")

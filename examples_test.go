@@ -73,11 +73,11 @@ func Example() {
 
 var c = new(rest.Context) // test context
 
-func ExampleContext_SetData() {
+func ExampleContext_DataSet() {
 	type myKeyType byte     // определяем собственный тип данных
 	var myKey myKeyType = 1 // генерируем уникальный ключ данных
 	// сохраняем данные в контексте, используя уникальный ключ
-	c.SetData(myKey, "Test data")
+	c.DataSet(myKey, "Test data")
 	// читаем данные с помощью ключа
 	str := c.Data(myKey).(string)
 	fmt.Println(str)
@@ -125,8 +125,8 @@ func ExampleContext_Parse() error {
 	return c.Send(data)
 }
 
-func ExampleContext_Header() {
-	c.SetHeader("ETag", "ab0138").SetHeader("Location", "/user/43952945")
+func ExampleContext_HeaderSet() {
+	c.HeaderSet("ETag", "ab0138").HeaderSet("Location", "/user/43952945")
 }
 
 var mux rest.ServeMux

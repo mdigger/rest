@@ -85,7 +85,7 @@ func ExampleContext_SetData() {
 }
 
 func ExampleContext_Error() error {
-	return c.Error(404)
+	return c.Error(404, "not found")
 }
 
 func ExampleContext_Send_json() error {

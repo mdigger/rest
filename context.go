@@ -208,11 +208,9 @@ func (c *Context) SetData(key, value interface{}) {
 	c.data[key] = value
 }
 
-// Error возвращает ошибку с указанным кодом окончания запроса. Является просто
-// удобным способом сформировать ошибку HTTPError. Эту ошибку можно вернуть в
-// качестве ошибки выполнения обработки.
-func (c *Context) Error(code int) *Error {
-	return NewError(code, "")
+// Error отсылает в ответ ошибку с указанным статусом и кодом.
+func (c *Context) Error(code int, msg string) error {
+	return c.Status(code).Send(msg)
 }
 
 // ErrDoubleSend возвращается Context.Send в случае повторной попытки послать

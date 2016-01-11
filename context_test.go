@@ -40,9 +40,6 @@ func TestContext(t *testing.T) {
 	if err := c.Status(200).Send(data); err != nil {
 		t.Error(err)
 	}
-	if c.Error(404) == nil {
-		t.Error("bad error generation")
-	}
 	fmt.Println("HTTP/1.1", w.Code)
 	w.HeaderMap.Write(os.Stdout)
 	fmt.Println()

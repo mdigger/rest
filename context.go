@@ -260,7 +260,7 @@ func (c *Context) Send(data interface{}) error {
 			return c.encode(NewError(c.status, ""))
 		}
 		return nil
-	case *Error:
+	case Error:
 		if d.Code >= 200 && d.Code < 600 {
 			c.status = d.Code
 		} else {

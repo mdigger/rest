@@ -6,16 +6,16 @@ import (
 	"path/filepath"
 )
 
-// Error устанавливает статус ответа и возвращает ошибку.
-func Error(err string, code int) Handler {
+// HTTPError устанавливает статус ответа и возвращает ошибку.
+func HTTPError(err string, code int) Handler {
 	return func(c *Context) error {
-		return &HTTPError{Code: code, Message: err}
+		return NewError(code, err)
 	}
 }
 
 // NotFound возвращает в ответ ошибку NotFound.
 func NotFound() Handler {
-	return Error(http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	return HTTPError(http.StatusText(http.StatusNotFound), http.StatusNotFound)
 }
 
 // Redirect возвращает перенаправляющий ответ.

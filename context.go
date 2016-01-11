@@ -148,10 +148,10 @@ func (c *Context) SetHeader(key, value string) *Context {
 		}
 		if value == "" {
 			// удаляем ключ, если пустое значение
-			c.response.Header().Del(key)
+			c.Header().Del(key)
 		} else {
 			// перезаписываем или создаем ключ заголовка
-			c.response.Header().Set(key, value)
+			c.Header().Set(key, value)
 		}
 	}
 	return c // возвращаем контекст, чтобы поддержать конвейер
@@ -159,9 +159,9 @@ func (c *Context) SetHeader(key, value string) *Context {
 
 // Parse декодирует содержимое запроса в объект. Максимальный размер содержимого
 // запроса ограничен размером MaxBytes, если установлен. Возвращает ошибку
-// HTTPError, если данные не соответствуют формату JSON или не получается их
+// Error, если данные не соответствуют формату JSON или не получается их
 // разобрать.
-func (c *Context) Parse(data interface{}) *HTTPError {
+func (c *Context) Parse(data interface{}) *Error {
 	// декодируем запрос и возвращаем ошибку, если случилась
 	return c.coder.Decode(c, data)
 }
@@ -211,8 +211,8 @@ func (c *Context) SetData(key, value interface{}) {
 // Error возвращает ошибку с указанным кодом окончания запроса. Является просто
 // удобным способом сформировать ошибку HTTPError. Эту ошибку можно вернуть в
 // качестве ошибки выполнения обработки.
-func (c *Context) Error(code int) *HTTPError {
-	return NewHTTPError(code)
+func (c *Context) Error(code int) *Error {
+	return NewError(code, "")
 }
 
 // ErrDoubleSend возвращается Context.Send в случае повторной попытки послать
@@ -255,11 +255,11 @@ func (c *Context) Send(data interface{}) error {
 			c.status = http.StatusNoContent
 		} else if c.status >= 400 {
 			// если статус соответствует ошибке, то формируем текст с описанием
-			return c.encode(&HTTPError{c.status, http.StatusText(c.status)})
+			return c.encode(NewError(c.status, ""))
 		}
 		return nil
 	case error:
-		if he, ok := d.(*HTTPError); ok {
+		if he, ok := d.(*Error); ok {
 			if he.Code >= 200 && he.Code < 600 {
 				// если в ошибке есть статус, то устанавливаем именно его
 				c.status = he.Code
@@ -277,9 +277,9 @@ func (c *Context) Send(data interface{}) error {
 				c.status = http.StatusInternalServerError
 			}
 		}
-		return c.encode(&HTTPError{c.status, d.Error()})
+		return c.encode(NewError(c.status, d.Error()))
 	case string: // строки тоже возвращаем в виде специального JSON
-		return c.encode(&HTTPError{c.status, d})
+		return c.encode(NewError(c.status, d))
 	case []byte: // уже готовый к отдаче набор данных
 		c.SetHeader("Content-Length", strconv.Itoa(len(d)))
 		_, err := c.Write(d) // тоже отдаем как есть

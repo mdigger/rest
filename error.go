@@ -18,14 +18,14 @@ type Error struct {
 // ошибку можно вернуть в качестве ошибки выполнения обработки в Context. Но
 // если вы хотите сохранить и сам текст ошибки, то лучше использовать
 // инициализацию объекта через &HTTPError.
-func NewError(code int, err string) *Error {
+func NewError(code int, err string) error {
 	if code < 200 || code >= 600 {
 		code = http.StatusInternalServerError
 	}
 	if err == "" {
 		err = http.StatusText(code)
 	}
-	return &Error{Code: code, Message: err}
+	return Error{Code: code, Message: err}
 }
 
 // Error возвращает строковое представление описания ошибки. Если текст ошибки

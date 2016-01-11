@@ -196,9 +196,9 @@ func ExampleServeMux_Handles() {
 	http.ListenAndServe(":8080", mux)
 }
 
-func ExampleError() {
+func ExampleHTTPError() {
 	mux.Handle("GET", "/server_error/",
-		rest.Error("no test", http.StatusInternalServerError))
+		rest.HTTPError("no test", http.StatusInternalServerError))
 }
 
 func ExampleNotFound() {

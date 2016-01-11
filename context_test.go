@@ -248,7 +248,7 @@ func TestContextHTTPError(t *testing.T) {
 	c := newContext(w, r)
 	defer c.close()
 
-	if err := c.Send(&HTTPError{}); err != nil {
+	if err := c.Send(&Error{}); err != nil {
 		t.Fatal(err)
 	}
 }

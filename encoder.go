@@ -18,8 +18,8 @@ type JSON map[string]interface{}
 // запроса в 16 мегабайт. Вы можете задать свой кодировщик при инициализации
 // ServeMux.
 type Coder interface {
-	Decode(c *Context, data interface{}) *HTTPError
-	Encode(c *Context, data interface{}) *HTTPError
+	Decode(c *Context, data interface{}) *Error
+	Encode(c *Context, data interface{}) *Error
 }
 
 // defaultCoder содержит Coder по умолчанию: JSON с максимальным размером данных
@@ -42,26 +42,20 @@ type JSONCoder struct {
 // буфер, выбираемый из пула буферов. Если `Content-Type` не установлен, то
 // устанавливает его как `application/json; charset=utf-8`. Так же устанавливает
 // размер данных.
-func (JSONCoder) Encode(c *Context, data interface{}) *HTTPError {
+func (JSONCoder) Encode(c *Context, data interface{}) *Error {
 	buf := buffers.Get().(*bytes.Buffer) // получаем буфер из пула
 	defer buffers.Put(buf)               // возвращаем в пул по окончании
 	buf.Reset()                          // сбрасываем предыдущие состояния
 	// декодируем объект в формат JSON используя буфер
 	if err := json.NewEncoder(buf).Encode(data); err != nil {
-		return &HTTPError{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-		}
+		return NewError(http.StatusInternalServerError, err.Error())
 	}
 	if c.Header().Get("ContentType") == "" {
 		c.SetHeader("Content-Type", "application/json; charset=utf-8")
 	}
 	c.SetHeader("Content-Length", strconv.Itoa(buf.Len()))
 	if _, err := buf.WriteTo(c); err != nil { // отдаем сформированный ответ
-		return &HTTPError{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-		}
+		return NewError(http.StatusInternalServerError, err.Error())
 	}
 	return nil
 }
@@ -69,7 +63,7 @@ func (JSONCoder) Encode(c *Context, data interface{}) *HTTPError {
 // Decoder декодирует содержимое запроса в формате JSON в объект. Перед
 // декодированием проверяется, что данные представлены в формате JSON и не
 // превышают максимально допустимый размер, задаваемый в MaxBodyBytes.
-func (j JSONCoder) Decode(c *Context, data interface{}) *HTTPError {
+func (j JSONCoder) Decode(c *Context, data interface{}) *Error {
 	// разбираем заголовок с типом информации в запросе
 	mediatype, params, _ := mime.ParseMediaType(
 		c.Request.Header.Get("Content-Type"))
@@ -79,20 +73,19 @@ func (j JSONCoder) Decode(c *Context, data interface{}) *HTTPError {
 	}
 	// если запрос не является JSON, то возвращаем ошибку
 	if mediatype != "application/json" || strings.ToUpper(charset) != "UTF-8" {
-		return NewHTTPError(http.StatusUnsupportedMediaType)
+		return NewError(http.StatusUnsupportedMediaType, "")
 	}
 	// если запрос превышает допустимый объем, то возвращаем ошибку
 	if j.MaxBodyBytes > 0 {
 		if c.Request.ContentLength == 0 {
-			return NewHTTPError(http.StatusLengthRequired)
+			return NewError(http.StatusLengthRequired, "")
 		} else if c.Request.ContentLength > j.MaxBodyBytes {
-			return NewHTTPError(http.StatusRequestEntityTooLarge)
+			return NewError(http.StatusRequestEntityTooLarge, "")
 		}
 	}
 	// разбираем содержимое запроса
 	if err := json.NewDecoder(c.Request.Body).Decode(data); err != nil {
-		// log.Println("Context Parse Error:", err)
-		return &HTTPError{http.StatusBadRequest, err.Error()}
+		return NewError(http.StatusBadRequest, err.Error())
 	}
 	return nil
 }

@@ -255,11 +255,9 @@ func (c *Context) Send(data interface{}) error {
 	case nil: // нечего отдавать
 		if c.status == 0 {
 			c.status = http.StatusNoContent
-		} else if c.status >= 400 {
-			// если статус соответствует ошибке, то формируем текст с описанием
-			return c.encode(NewError(c.status, ""))
 		}
-		return nil
+		_, err := c.Write(nil)
+		return err
 	case Error:
 		if d.Code >= 200 && d.Code < 600 {
 			c.status = d.Code

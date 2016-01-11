@@ -75,6 +75,36 @@ func (c *Context) Header() http.Header {
 	return c.response.Header()
 }
 
+// HeaderSet устанавливает новое значение для указанного HTTP-заголовка ответа.
+// Все записи с таким же именем заголовка будут перезаписаны. Если передаваемое
+// значение заголовка пустое, то данный заголовок будет удален.
+//
+// Если устанавливается заголовок `Content-Type`, то соответствующее свойство
+// контекста тоже принимает это же значение. Заголовок `Content-Length` будет
+// установлен только в том случае, если ответ не сжимается (проверка проводится
+// по заголовку ответа).
+func (c *Context) HeaderSet(key, value string) *Context {
+	if !c.sended { // нельзя изменить заголовок после ответа
+		switch key {
+		case "Content-Type":
+			c.ContentType = value
+		case "Content-Length":
+			if c.Header().Get("Content-Encoding") != "" {
+				// не устанавливаем длину, если поддерживается сжатие ответа
+				value = ""
+			}
+		}
+		if value == "" {
+			// удаляем ключ, если пустое значение
+			c.Header().Del(key)
+		} else {
+			// перезаписываем или создаем ключ заголовка
+			c.Header().Set(key, value)
+		}
+	}
+	return c // возвращаем контекст, чтобы поддержать конвейер
+}
+
 // Write возвращает данные из параметра в качестве ответа сервера. Автоматически
 // устанавливает статус ответа в http.StatusOK, если не было указано другого
 // статуса, а так же взводит внутренний флаг, что отсылка ответа начата. Если
@@ -84,7 +114,7 @@ func (c *Context) Header() http.Header {
 func (c *Context) Write(data []byte) (int, error) {
 	if !c.sended {
 		if c.Header().Get("Content-Type") == "" {
-			c.SetHeader("Content-Type", http.DetectContentType(data))
+			c.HeaderSet("Content-Type", http.DetectContentType(data))
 		}
 		c.WriteHeader(c.status)
 	}
@@ -127,36 +157,6 @@ func (c *Context) Status(code int) *Context {
 	return c
 }
 
-// SetHeader устанавливает новое значение для указанного HTTP-заголовка ответа.
-// Все записи с таким же именем заголовка будут перезаписаны. Если передаваемое
-// значение заголовка пустое, то данный заголовок будет удален.
-//
-// Если устанавливается заголовок `Content-Type`, то соответствующее свойство
-// контекста тоже принимает это же значение. Заголовок `Content-Length` будет
-// установлен только в том случае, если ответ не сжимается (проверка проводится
-// по заголовку ответа).
-func (c *Context) SetHeader(key, value string) *Context {
-	if !c.sended { // нельзя изменить заголовок после ответа
-		switch key {
-		case "Content-Type":
-			c.ContentType = value
-		case "Content-Length":
-			if c.Header().Get("Content-Encoding") != "" {
-				// не устанавливаем длину, если поддерживается сжатие ответа
-				value = ""
-			}
-		}
-		if value == "" {
-			// удаляем ключ, если пустое значение
-			c.Header().Del(key)
-		} else {
-			// перезаписываем или создаем ключ заголовка
-			c.Header().Set(key, value)
-		}
-	}
-	return c // возвращаем контекст, чтобы поддержать конвейер
-}
-
 // Parse декодирует содержимое запроса в объект. Максимальный размер содержимого
 // запроса ограничен размером MaxBytes, если установлен. Возвращает ошибку
 // Error, если данные не соответствуют формату JSON или не получается их
@@ -194,14 +194,14 @@ func (c *Context) Data(key interface{}) interface{} {
 	return c.data[key]
 }
 
-// SetData сохраняет пользовательские данные в контексте запроса с указанным
+// DataSet сохраняет пользовательские данные в контексте запроса с указанным
 // ключем.
 //
 // Рекомендуется в качестве ключа использовать какой-нибудь приватный тип и его
 // значение, чтобы избежать случайного затирания данных другими обработчиками:
 // это гарантированно обезопасит от случайного доступа к ним. Но строки тоже
 // поддерживаются. :)
-func (c *Context) SetData(key, value interface{}) {
+func (c *Context) DataSet(key, value interface{}) {
 	if c.data == nil {
 		c.data = make(map[interface{}]interface{})
 	}
@@ -246,7 +246,7 @@ func (c *Context) Send(data interface{}) error {
 		return ErrDoubleSend
 	}
 	if c.ContentType != "" {
-		c.SetHeader("Content-Type", c.ContentType)
+		c.HeaderSet("Content-Type", c.ContentType)
 	}
 	// в зависимости от типа данных поддерживаются разные методы вывода
 	// для []byte и io.Reader отдаем все как есть, а для остальных типов данных
@@ -289,7 +289,7 @@ func (c *Context) Send(data interface{}) error {
 		}
 		return c.encode(NewError(c.status, d))
 	case []byte: // уже готовый к отдаче набор данных
-		c.SetHeader("Content-Length", strconv.Itoa(len(d)))
+		c.HeaderSet("Content-Length", strconv.Itoa(len(d)))
 		_, err := c.Write(d) // тоже отдаем как есть
 		return err
 	case io.Reader: // поток данных отдаем как есть
@@ -305,7 +305,7 @@ func (c *Context) Send(data interface{}) error {
 				return err
 			}
 			// устанавливаем размер ответа
-			c.SetHeader("Content-Length", strconv.FormatInt(size, 10))
+			c.HeaderSet("Content-Length", strconv.FormatInt(size, 10))
 		}
 		_, err := io.Copy(c, d) // копируем данные в ответ
 		if closer, ok := d.(io.Closer); ok {

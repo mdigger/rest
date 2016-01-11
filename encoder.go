@@ -1,13 +1,11 @@
 package rest
 
 import (
-	"bytes"
 	"encoding/json"
 	"mime"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 // JSON является вспомогательным типом для быстрого создания JSON-структур.
@@ -38,26 +36,36 @@ type JSONCoder struct {
 	MaxBodyBytes int64 // максимально допустимый размер данных в запросе
 }
 
-// Encode отдает data в формате JSON. Для кодирования используется внутренний
-// буфер, выбираемый из пула буферов. Если `Content-Type` не установлен, то
+// Encode отдает data в формате JSON.Если `Content-Type` не установлен, то
 // устанавливает его как `application/json; charset=utf-8`. Так же устанавливает
 // размер данных.
 func (JSONCoder) Encode(c *Context, data interface{}) error {
-	buf := buffers.Get().(*bytes.Buffer) // получаем буфер из пула
-	defer buffers.Put(buf)               // возвращаем в пул по окончании
-	buf.Reset()                          // сбрасываем предыдущие состояния
-	// декодируем объект в формат JSON используя буфер
-	if err := json.NewEncoder(buf).Encode(data); err != nil {
+	jdata, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
 		return err
 	}
 	if c.Header().Get("ContentType") == "" {
 		c.HeaderSet("Content-Type", "application/json; charset=utf-8")
 	}
-	c.HeaderSet("Content-Length", strconv.Itoa(buf.Len()))
-	if _, err := buf.WriteTo(c); err != nil { // отдаем сформированный ответ
-		return err
-	}
-	return nil
+	c.HeaderSet("Content-Length", strconv.Itoa(len(jdata)))
+	_, err = c.Write(jdata)
+	return err
+
+	// buf := buffers.Get().(*bytes.Buffer) // получаем буфер из пула
+	// defer buffers.Put(buf)               // возвращаем в пул по окончании
+	// buf.Reset()                          // сбрасываем предыдущие состояния
+	// // декодируем объект в формат JSON используя буфер
+	// if err := json.NewEncoder(buf).Encode(data); err != nil {
+	// 	return err
+	// }
+	// if c.Header().Get("ContentType") == "" {
+	// 	c.HeaderSet("Content-Type", "application/json; charset=utf-8")
+	// }
+	// c.HeaderSet("Content-Length", strconv.Itoa(buf.Len()))
+	// if _, err := buf.WriteTo(c); err != nil { // отдаем сформированный ответ
+	// 	return err
+	// }
+	// return nil
 }
 
 // Decoder декодирует содержимое запроса в формате JSON в объект. Перед
@@ -90,4 +98,4 @@ func (j JSONCoder) Decode(c *Context, data interface{}) error {
 	return nil
 }
 
-var buffers = sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}
+// var buffers = sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}

@@ -258,15 +258,15 @@ func (c *Context) Send(data interface{}) error {
 			return c.encode(NewError(c.status, ""))
 		}
 		return nil
+	case *Error:
+		if d.Code >= 200 && d.Code < 600 {
+			c.status = d.Code
+		} else {
+			c.status = http.StatusInternalServerError
+		}
+		return c.encode(NewError(c.status, d.Error()))
 	case error:
-		if he, ok := d.(*Error); ok {
-			if he.Code >= 200 && he.Code < 600 {
-				// если в ошибке есть статус, то устанавливаем именно его
-				c.status = he.Code
-			} else {
-				c.status = http.StatusInternalServerError
-			}
-		} else if c.status == 0 {
+		if c.status == 0 {
 			// если статус не установлен, то ориентируемся на тип ошибки
 			switch {
 			case os.IsNotExist(d):
@@ -277,7 +277,10 @@ func (c *Context) Send(data interface{}) error {
 				c.status = http.StatusInternalServerError
 			}
 		}
-		return c.encode(NewError(c.status, d.Error()))
+		if Debug {
+			return c.encode(NewError(c.status, d.Error()))
+		}
+		return c.encode(NewError(c.status, ""))
 	case string: // строки тоже возвращаем в виде специального JSON
 		return c.encode(NewError(c.status, d))
 	case []byte: // уже готовый к отдаче набор данных

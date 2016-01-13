@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mdigger/rest"
+	"github.com/mdigger/rest2"
 )
 
 func Example() {
@@ -23,7 +23,7 @@ func Example() {
 			"POST": func(c *rest.Context) error {
 				var data = make(rest.JSON)
 				// можно быстро десериализовать JSON, переданный в запросе, в объект
-				if err := c.Parse(&data); err != nil {
+				if err := c.Bind(&data); err != nil {
 					// возвращать ошибки тоже удобно
 					return err
 				}
@@ -57,7 +57,7 @@ func Example() {
 		},
 		"/favicon.ico": {
 			// для работы со статическими файлами определена специальная функция
-			"GET": rest.ServeFile("./favicon.ico"),
+			"GET": rest.File("./favicon.ico"),
 		},
 	})
 	// можно сразу задать базовый путь для всех URL, используемых в обработчиках
@@ -73,19 +73,14 @@ func Example() {
 
 var c = new(rest.Context) // test context
 
-func ExampleContext_DataSet() {
+func ExampleContext_SetData() {
 	type myKeyType byte     // определяем собственный тип данных
 	var myKey myKeyType = 1 // генерируем уникальный ключ данных
 	// сохраняем данные в контексте, используя уникальный ключ
-	c.DataSet(myKey, "Test data")
+	c.SetData(myKey, "Test data")
 	// читаем данные с помощью ключа
 	str := c.Data(myKey).(string)
 	fmt.Println(str)
-	// Output: Test data
-}
-
-func ExampleContext_Error() error {
-	return c.Error(404, "not found")
 }
 
 func ExampleContext_Send_json() error {
@@ -114,19 +109,15 @@ func ExampleContext_Status() error {
 	return c.Status(201).Send(nil)
 }
 
-func ExampleContext_Parse() error {
+func ExampleContext_Bind() error {
 	// инициализируем формат данных для разбора
 	data := make(map[string]interface{})
 	// читаем запрос и получаем данные в разобранном виде
-	if err := c.Parse(&data); err != nil {
+	if err := c.Bind(&data); err != nil {
 		return err
 	}
 	// возвращаем эти же данные в ответ
 	return c.Send(data)
-}
-
-func ExampleContext_HeaderSet() {
-	c.HeaderSet("ETag", "ab0138").HeaderSet("Location", "/user/43952945")
 }
 
 var mux rest.ServeMux
@@ -160,10 +151,10 @@ func ExampleServeMux_ServeHTTP() {
 					"date": time.Now().UTC(),
 				})
 			},
-			"POST": rest.StaticData("OK", ""),
+			"POST": rest.Data("OK", "text/plain"),
 		},
 		"/favicon.ico": {
-			"GET": rest.ServeFile("./favicon.ico"),
+			"GET": rest.File("./favicon.ico"),
 		},
 	})
 	http.ListenAndServe(":8080", mux)
@@ -171,8 +162,8 @@ func ExampleServeMux_ServeHTTP() {
 
 type User struct{}
 
-func (User) get(*rest.Context)           {}
-func (User) post(*rest.Context)          {}
+func (User) get(*rest.Context) error     { return nil }
+func (User) post(*rest.Context) error    { return nil }
 func secure(h rest.Handler) rest.Handler { return h }
 
 var (
@@ -196,33 +187,20 @@ func ExampleServeMux_Handles() {
 	http.ListenAndServe(":8080", mux)
 }
 
-func ExampleHTTPError() {
-	mux.Handle("GET", "/server_error/",
-		rest.HTTPError("no test", http.StatusInternalServerError))
-}
-
-func ExampleNotFound() {
-	mux.Handle("GET", "/not_found/", rest.NotFound())
-}
-
 func ExampleRedirect() {
-	mux.Handle("GET", "/redirect/",
-		rest.Redirect("/json/", http.StatusMovedPermanently))
+	mux.Handle("GET", "/redirect/", rest.Redirect("/json/"))
 }
 
-func ExampleStatic() {
-	mux.Handle("GET", "/static/",
-		rest.StaticData("OK", ""))
+func ExampleData() {
+	mux.Handle("GET", "/static/", rest.Data("OK", ""))
 	mux.Handle("GET", "/bin/",
-		rest.StaticData([]byte{0x1, 0x2, 0x3, 0x4}, "application/binary"))
+		rest.Data([]byte{0x1, 0x2, 0x3, 0x4}, "application/octet-stream"))
 }
 
-func ExampleServeFile() {
-	mux.Handle("GET", "/favicon.ico",
-		rest.ServeFile("./favicon.ico"))
+func ExampleFile() {
+	mux.Handle("GET", "/favicon.ico", rest.File("./favicon.ico"))
 }
 
-func ExampleServeParamFile() {
-	mux.Handle("GET", "/files/:name",
-		rest.ServeParamFile("name", "./tmp/"))
+func ExampleFiles() {
+	mux.Handle("GET", "/files/:name", rest.Files("./tmp/"))
 }

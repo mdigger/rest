@@ -54,6 +54,11 @@ var (
 // устанавливается тип ответа. Если вы хотите определить тип ответа
 // самостоятельно, то проще всего установить значение ContentType строкой с
 // описанием нужного типа.
+//
+// Есть два пути отослать в ответ ошибку: послать ее через Context.Send или
+// вернуть ее из обработчика. Результат, в конечном счете, будет приблизительно
+// одинаковый: разница только в том, что при возврате ошибки из обработчика,
+// она будет записана в лог, а в случае посылки ее через Send — нет.
 type Context struct {
 	*http.Request        // HTTP запрос в разобранном виде
 	ContentType   string // тип информации в ответе
@@ -375,10 +380,10 @@ func (c *Context) Send(data interface{}) (err error) {
 		// В зависимости от флага, ошибку выводим как JSON или как текст
 		if JSONError {
 			c.ContentType = "application/json; charset=utf-8"
-			json.NewEncoder(c).Encode(JSON{"code": c.status, "error": msg})
+			err = json.NewEncoder(c).Encode(JSON{"code": c.status, "error": msg})
 		} else {
 			c.ContentType = "text/plain; charset=utf-8"
-			fmt.Fprint(c, msg)
+			_, err = fmt.Fprint(c, msg)
 		}
 	}
 	return

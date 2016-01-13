@@ -389,6 +389,21 @@ func (c *Context) Send(data interface{}) (err error) {
 	return
 }
 
+// Error отправляет указанный текст как описание ошибки. В зависимости от
+// флага JSONError, данный текст будет отдан как описание или как JSON с кодом
+// статуса. В отличии от обычных ошибок, на данный текст не распространяется
+// правило отладки и текст будет отдан в неизменном виде, в не зависимости от
+// установленного значения Debug.
+func (c *Context) Error(code int, msg string) error {
+	c.Status(code) // устанавливаем код ответа
+	if JSONError {
+		c.ContentType = "application/json; charset=utf-8"
+		return c.Send(JSON{"code": c.status, "error": msg})
+	}
+	c.ContentType = "text/plain; charset=utf-8"
+	return c.Send(msg)
+}
+
 // Redirect отсылает ответ с требованием временного перехода по указанному URL.
 // Ошибка никогда не возвращается.
 func (c *Context) Redirect(url string) error {

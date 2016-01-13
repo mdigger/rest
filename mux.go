@@ -74,8 +74,14 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				runtime.FuncForPC(reflect.ValueOf(handler).Pointer()).Name())
 		}
 		// вызываем обработчик запроса
-		if err := handler(c); err != nil && accessLog != nil {
-			c.errorLog(err, false) // записываем ошибку в лог
+		if err := handler(c); err != nil {
+			if accessLog != nil {
+				c.errorLog(err, false) // записываем ошибку в лог
+			}
+			// если ничего не отправляли, то отправляем эту ошибку
+			if !c.sended {
+				c.Send(err) // возвращаемые ошибки игнорируем
+			}
 		}
 		return
 	}

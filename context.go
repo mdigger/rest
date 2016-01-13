@@ -35,6 +35,10 @@ var (
 	// обработчика запросов и, в этом случае, сжатие не будет включено, даже
 	// если флаг установлен.
 	Compress bool = true
+	// JSONError управляет форматом вывода ошибок: если флаг не взведен, то
+	// ошибки отдаются как текст. В противном случае описание ошибок
+	// возвращается в виде JSON, в котором содержится статус и описание ошибки.
+	JSONError bool = true
 )
 
 // Context содержит контекстную информацию HTTP-запроса и методы формирования
@@ -291,10 +295,12 @@ var (
 )
 
 // Send отсылает переданные данные как ответ на запрос. В зависимости от типа
-// данных используются разные форматы ответов.
+// данных, используются разные форматы ответов. Поддерживаются данные в формате
+// string, error, []byte, io.Reader и nil. Все остальные типы данных приводятся
+// к формату JSON.
 //
 // Данный метод можно использовать только один раз: после того, как ответ
-// отправлен, повторный вызов данного метода сразу возвращает ошибку
+// отправлен, повторный вызов данного метода сразу возвращает ошибку.
 func (c *Context) Send(data interface{}) (err error) {
 	// не можем отправить ответ, если он уже отправлен
 	if c.sended {
@@ -346,14 +352,20 @@ func (c *Context) Send(data interface{}) (err error) {
 				}
 			}
 		}
-		if c.ContentType == "" {
-			c.ContentType = "text/plain; charset=utf-8"
-		}
 		// В отладочном режиме возвращаем текст ошибки, иначе — тест статуса
+		var msg string
 		if Debug {
-			_, err = fmt.Fprint(c, data.Error())
+			msg = data.Error()
 		} else {
-			_, err = fmt.Fprint(c, http.StatusText(c.status))
+			msg = http.StatusText(c.status)
+		}
+		// В зависимости от флага, ошибку выводим как JSON или как текст
+		if JSONError {
+			c.ContentType = "application/json; charset=utf-8"
+			err = json.NewEncoder(c).Encode(JSON{"code": c.status, "error": msg})
+		} else {
+			c.ContentType = "text/plain; charset=utf-8"
+			_, err = fmt.Fprint(c, msg)
 		}
 	case []byte:
 		_, err = c.Write(data)

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mdigger/rest2"
+	"github.com/mdigger/rest"
 )
 
 func Example() {
@@ -44,6 +44,7 @@ func Example() {
 				if err != nil {
 					return err
 				}
+				defer file.Close()
 				// можно получать не только именованные элементы пути, но
 				// параметры, используемые в запросе
 				if c.Param("format") == "raw" {
@@ -52,7 +53,6 @@ func Example() {
 					c.ContentType = `text/html; charset="utf-8"`
 				}
 				return c.Send(file) // отдаем содержимое файла
-				// закрытие файла произойдет автоматически
 			},
 		},
 		"/favicon.ico": {
@@ -95,8 +95,6 @@ func ExampleContext_Send_file() error {
 	if err != nil {
 		return err
 	}
-	// закрытие файла не обязательно, т.к. метод Send автоматически
-	// закроет его, если поддерживается интрефейс io.ReadCloser
 	defer file.Close()
 	// устанавливаем тип отдаваемых данных
 	c.ContentType = "text/markdown; charset=UTF-8"

@@ -319,54 +319,8 @@ func (c *Context) Send(data interface{}) (err error) {
 		}
 		_, err = fmt.Fprint(c, data)
 	case error:
-		// если статус не установлен, то ориентируемся на тип ошибки
-		if c.status == 0 {
-			switch data {
-			case ErrBadRequest: // 400
-				c.status = http.StatusBadRequest
-			case ErrUnauthorized: // 401
-				c.status = http.StatusUnauthorized
-			case ErrForbidden: // 403
-				c.status = http.StatusForbidden
-			case ErrNotFound: // 404
-				c.status = http.StatusNotFound
-			case ErrLengthRequired: // 411
-				c.status = http.StatusLengthRequired
-			case ErrRequestEntityTooLarge: // 413
-				c.status = http.StatusRequestEntityTooLarge
-			case ErrUnsupportedMediaType: // 415
-				c.status = http.StatusUnsupportedMediaType
-			case ErrInternalServerError: // 500
-				c.status = http.StatusInternalServerError
-			case ErrNotImplemented: // 501
-				c.status = http.StatusNotImplemented
-			case ErrServiceUnavailable: // 503
-				c.status = http.StatusServiceUnavailable
-			default:
-				if os.IsNotExist(data) {
-					c.status = http.StatusNotFound
-				} else if os.IsPermission(data) {
-					c.status = http.StatusForbidden
-				} else {
-					c.status = http.StatusInternalServerError
-				}
-			}
-		}
-		// В отладочном режиме возвращаем текст ошибки, иначе — тест статуса
-		var msg string
-		if Debug {
-			msg = data.Error()
-		} else {
-			msg = http.StatusText(c.status)
-		}
-		// В зависимости от флага, ошибку выводим как JSON или как текст
-		if JSONError {
-			c.ContentType = "application/json; charset=utf-8"
-			err = json.NewEncoder(c).Encode(JSON{"code": c.status, "error": msg})
-		} else {
-			c.ContentType = "text/plain; charset=utf-8"
-			_, err = fmt.Fprint(c, msg)
-		}
+		err = data // сводим задачу к обработке окончательной ошибки
+		break
 	case []byte:
 		_, err = c.Write(data)
 	case io.Reader:
@@ -377,10 +331,41 @@ func (c *Context) Send(data interface{}) (err error) {
 		}
 		err = json.NewEncoder(c).Encode(data)
 	}
-	// если в процессе отправки произошла ошибка, но мы еще ничего не
-	// отправили, то отдаем ошибку
+	// если в процессе отправки произошла ошибка, но мы еще ничего не отправили,
+	// то отдаем ошибку
 	if err != nil && !c.sended {
-		c.status = http.StatusInternalServerError
+		// устанавливаем статус, в зависимости от ошибки
+		switch err {
+		case ErrBadRequest: // 400
+			c.status = http.StatusBadRequest
+		case ErrUnauthorized: // 401
+			c.status = http.StatusUnauthorized
+		case ErrForbidden: // 403
+			c.status = http.StatusForbidden
+		case ErrNotFound: // 404
+			c.status = http.StatusNotFound
+		case ErrLengthRequired: // 411
+			c.status = http.StatusLengthRequired
+		case ErrRequestEntityTooLarge: // 413
+			c.status = http.StatusRequestEntityTooLarge
+		case ErrUnsupportedMediaType: // 415
+			c.status = http.StatusUnsupportedMediaType
+		case ErrInternalServerError: // 500
+			c.status = http.StatusInternalServerError
+		case ErrNotImplemented: // 501
+			c.status = http.StatusNotImplemented
+		case ErrServiceUnavailable: // 503
+			c.status = http.StatusServiceUnavailable
+		default:
+			if os.IsNotExist(err) {
+				c.status = http.StatusNotFound
+			} else if os.IsPermission(err) {
+				c.status = http.StatusForbidden
+			} else {
+				c.status = http.StatusInternalServerError
+			}
+		}
+		// В зависимости от флага Debug, отдаем либо текст ошибки, либо статуса
 		var msg string
 		if Debug {
 			msg = err.Error()

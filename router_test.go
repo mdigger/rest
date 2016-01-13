@@ -1,153 +1,132 @@
 package rest
 
 import (
-	"fmt"
+	"reflect"
+	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/kr/pretty"
 )
 
-var urls = []string{
-	"///user/:id/param1/param2/:id/param3//",
-	"/user/:id/param",
-	"/user/:id",
-	"/user/test",
-	"/user/vova/:param",
-	"/user/:vova/param3",
-	"/user/:id/param2",
-	"/user",
-	"/user/*test",
-	"/user/:id/*param2",
-}
-
-func TestSplit(t *testing.T) {
-	for _, url := range urls {
-		splitted := split(url)
-		fmt.Printf("%q\n", splitted)
-		if strings.Join(splitted, "/") != strings.Trim(url, "/") {
-			t.Error(url, splitted)
-		}
-	}
-}
-
 func TestRouter(t *testing.T) {
+	tests := []struct {
+		url     string
+		bad     bool
+		handler Handler
+	}{
+		{"/test/:p1/:p2", false, func(c *Context) error { return nil }},
+		{"/test/:p1/:p2/*p3", false, func(c *Context) error { return nil }},
+		{"/:p1/:p2/*p3", false, func(c *Context) error { return nil }},
+		{"/p1/p2/p3/p4", false, func(c *Context) error { return nil }},
+		{"p2/*p1", false, func(c *Context) error { return nil }},
+		{"p2/*p1/:bad", true, func(c *Context) error { return nil }},
+	}
+	// список урлов и номер обработчика
+	urls := map[string]int{
+		"/test/param1/param2":               0,
+		"/test/param1/param2/param3/param4": 1,
+		"/test/param1/param2/param3":        1,
+		"/p1/p2/p3/p4":                      3,
+		"/p2/p3/p4":                         2,
+		"/p2/p3/p4/p5":                      2,
+	}
 	var r router
+	for i, test := range tests {
+		err := r.add(test.url, test.handler)
+		if test.bad && err == nil {
+			t.Errorf("error in add bad test %d", i)
+		} else if !test.bad && err != nil {
+			t.Errorf("error in add test %d", i)
+		}
+	}
+	for i, test := range tests {
+		path := r.path(test.handler)
+		if test.bad && path != nil {
+			t.Errorf("error in path bad test %d", i)
+		} else if !test.bad && path == nil {
+			t.Errorf("error in path test %d", i)
+		}
+	}
+	for url, num := range urls {
+		handler, _ := r.lookup(url)
+		if num < 0 && handler != nil {
+			t.Errorf("bad test lookup for url %q", url)
+		} else {
+			h1 := runtime.FuncForPC(reflect.ValueOf(tests[num].handler).Pointer()).Entry()
+			h2 := runtime.FuncForPC(reflect.ValueOf(handler).Pointer()).Entry()
+			if h1 != h2 {
+				t.Errorf("bad handler for test lookup url %q", url)
+			}
+		}
+	}
+
+	// pretty.Println(r)
+}
+
+func TestRouter2(t *testing.T) {
+	urls := []string{
+		"/p1/p2/p3/:p4",
+		"/p1/p2/:p3/p4",
+		"/p1/:p2/p3/p4",
+		"/:p1/p2/p3/p4",
+		"/:p1/p2/p3/:p4",
+		"/:p1/p2/:p3/p4",
+		"/:p1/p2/:p3/:p4",
+		"/:p1/:p2/p3/p4",
+		"/:p1/:p2/p3/:p4",
+		"/:p1/:p2/:p3/p4",
+		"/:p1/:p2/:p3/:p4",
+	}
+	var r router
+	if h, _ := r.lookup("/test"); h != nil {
+		t.Error("bad lookup")
+	}
 	for _, url := range urls {
-		if err := r.add(url, url); err != nil {
+		if err := r.add(url, func(*Context) error { return nil }); err != nil {
 			t.Error(err)
 		}
 	}
-	pretty.Println(r)
-	for _, url := range urls {
-		handler, params := r.lookup(url)
-		if handler == nil {
-			t.Error("Nil handler:", url)
-		}
-		fmt.Println(handler, params)
+	if h, _ := r.lookup("/1/2/3/4/5"); h != nil {
+		t.Error("bad lookup")
 	}
-	url := "/user/:id/param1/"
-	handler, params := r.lookup(url)
-	if handler == nil {
-		t.Error("Bad handler:", url)
-	}
-	fmt.Println(handler, params)
-	handler, params = r.lookup("/user/test/mama/1/2/3/4/5/6/7/8/9/0/")
-	if handler == nil {
-		t.Error("Bad handler:", url)
-	}
-}
-
-func TestOnlyStaticRouter(t *testing.T) {
-	var r router
-	var urls = []string{
-		"test/url",
-		"test2/url",
-		"test2/add",
-		"test/add",
-		"test",
-	}
-	for _, url := range urls {
-		if err := r.add(url, "long"); err != nil {
-			t.Error(err)
-		}
-	}
-	handler, _ := r.lookup("/test")
-	if handler == nil {
-		t.Error("Bad handler:", "/test")
-	}
-	handler, _ = r.lookup("/test2")
-	if handler != nil {
-		t.Error("Bad handler:", "/test2")
-	}
-}
-
-func TestRouterSort(t *testing.T) {
-	var r router
-	var urls = []string{
-		"/1/2/*3/",
-		"/1/:2/*3/",
-		"/:1/2/*3/",
-		"/:1/:2/*3/",
-		"/1/2/3/",
-		"/:1/2/3/",
-		"/1/:2/3/",
-		"/1/2/:3/",
-		"/:1/:2/3/",
-		"/:1/2/:3/",
-		"/1/:2/:3/",
-	}
-	for _, url := range urls {
-		if err := r.add(url, url); err != nil {
-			t.Error(err)
-		}
-	}
-	pretty.Println(r)
-}
-
-func TestRouterBad(t *testing.T) {
-	var r router
-	if err := r.add("/*test/:test", "bad"); err == nil {
-		t.Error("bad * param in path")
-	}
-	if h, _ := r.lookup("/1/2/3/4/5/"); h != nil {
-		t.Error("bad handler")
-	}
-	if err := r.add(strings.Repeat("/:test", 1<<15+1), "bad long"); err == nil {
-		t.Error("bad long handler")
-	}
-	if err := r.add("/:test/:test", "bad"); err != nil {
+	if err := r.add("/p1/p2/p3/p4/*p5", func(*Context) error { return nil }); err != nil {
 		t.Error(err)
 	}
-	if h, _ := r.lookup("/1/2/3/4/5/"); h != nil {
-		t.Error("bad handler")
+	if h, _ := r.lookup("/p1/p2/p3/p4/p5/p6/p7"); h == nil {
+		t.Error("bad catch all lookup")
 	}
+	if err := r.add("/p1/p2/*p5", func(*Context) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if h, _ := r.lookup("/p1/p2/p3/p4/p5/p6/p7"); h == nil {
+		t.Error("bad catch all lookup")
+	}
+	if h, _ := r.lookup("/p0/p2/p3/p4/p5/p6/p7"); h != nil {
+		t.Error("bad lookup")
+	}
+	if err := r.add("/a1/a2/*a3", func(*Context) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if h, _ := r.lookup("/a1/a2/a3/a4/a5/a6/a7"); h == nil {
+		t.Error("bad lookup a")
+	}
+	if err := r.add("/a1/a2/a3/a4/a5/a6/:a7", func(*Context) error { return nil }); err != nil {
+		t.Error(err)
+	}
+	if h, _ := r.lookup("/a1/a2/a3/a4/a5/a6"); h == nil {
+		t.Error("bad lookup a")
+	}
+	if h, _ := r.lookup("/a1/a2/a3/a4/a5/a6/a7"); h == nil {
+		t.Error("bad lookup a")
+	}
+	// pretty.Println(r)
 }
 
-func TestRouterDynamic(t *testing.T) {
+func TestRouterMax(t *testing.T) {
 	var r router
-	var urls = []string{
-		"/1/2/*3/",
-		"/1/:2/*3/",
-		"/:1/2/*3/",
-		"/1/2/3/",
-		"/:1/2/3/",
-		"/1/:2/3/",
-		"/1/2/:3/",
-		"/:1/:2/3/",
-		"/:1/2/:3/",
-		"/1/:2/:3/",
-		// "/1/*2/",
+	if err := r.add(strings.Repeat("/:param", 1<<15), func(*Context) error { return nil }); err == nil {
+		t.Error("bad max path length")
 	}
-	for _, url := range urls {
-		if err := r.add(url, url); err != nil {
-			t.Error(err)
-		}
+	if err := r.add("/", nil); err == nil {
+		t.Error("bad add nil handler")
 	}
-	pretty.Println(r)
-	pretty.Println(r.lookup("/1/2/3/4/5/6"))
-	pretty.Println(r.lookup("/1/2/3/4/5"))
-	pretty.Println(r.lookup("/1/2/3/"))
-	pretty.Println(r.lookup("/1/2/"))
-	pretty.Println(r.lookup("/1/"))
 }

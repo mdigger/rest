@@ -277,9 +277,9 @@ func (c *Context) Bind(obj interface{}) error {
 // Эти ошибки обрабатываются при передаче их в метод Context.Send и
 // устанавливают соответствующий статус ответа.
 //
-// Кроме указанных здесь ошибок, так же проверяется, что ошибка может
-// соответствовать os.IsNotExist (в этом случае статус станет 404) и
-// os.IsPermission (статус 403). Все остальные ошибки устанавливают статус 500.
+// Кроме указанных здесь ошибок, так же проверяется, что ошибка отвечает на
+// os.IsNotExist (в этом случае статус станет 404) или os.IsPermission (статус
+// 403). Все остальные ошибки устанавливают статус 500.
 var (
 	ErrDataAlreadySent       = errors.New("data already sent")
 	ErrBadRequest            = errors.New("bad request")              // 400
@@ -380,13 +380,20 @@ func (c *Context) Send(data interface{}) (err error) {
 	// если в процессе отправки произошла ошибка, но мы еще ничего не
 	// отправили, то отдаем ошибку
 	if err != nil && !c.sended {
-		c.ContentType = "text/plain; charset=utf-8"
 		c.status = http.StatusInternalServerError
-		// В отладочном режиме возвращаем текст ошибки, иначе — тест статуса
+		var msg string
 		if Debug {
-			fmt.Fprint(c, err.Error())
+			msg = err.Error()
 		} else {
-			fmt.Fprint(c, http.StatusText(c.status))
+			msg = http.StatusText(c.status)
+		}
+		// В зависимости от флага, ошибку выводим как JSON или как текст
+		if JSONError {
+			c.ContentType = "application/json; charset=utf-8"
+			json.NewEncoder(c).Encode(JSON{"code": c.status, "error": msg})
+		} else {
+			c.ContentType = "text/plain; charset=utf-8"
+			fmt.Fprint(c, msg)
 		}
 	}
 	return

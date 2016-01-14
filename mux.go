@@ -16,7 +16,7 @@ type ServeMux struct {
 	// ко всем ответам, возвращаемым данным обработчиком
 	Headers map[string]string
 
-	routers map[string]router // обработчики запросов по методам
+	routers map[string]*router // обработчики запросов по методам
 }
 
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler. Таким образом,
@@ -120,16 +120,17 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 	// если список обработчиков еще не инициализирован, то инициализируем его
 	if m.routers == nil {
 		// обычно используется не более 9 методов HTTP
-		m.routers = make(map[string]router, 9)
+		m.routers = make(map[string]*router, 9)
 	}
 	// получаем список обработчиков для данного метода
-	router, ok := m.routers[strings.ToUpper(method)]
-	// добавляем обработчик для заданного метода и пути
-	if err := router.add(path, handler); err != nil {
-		panic(err) // обработчик нас не устраивает по каким-то причинам
+	r := m.routers[strings.ToUpper(method)]
+	if r == nil {
+		r = new(router)
+		m.routers[strings.ToUpper(method)] = r
 	}
-	if !ok {
-		m.routers[strings.ToUpper(method)] = router
+	// добавляем обработчик для заданного метода и пути
+	if err := r.add(path, handler); err != nil {
+		panic(err) // обработчик нас не устраивает по каким-то причинам
 	}
 }
 

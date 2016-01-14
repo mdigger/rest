@@ -319,7 +319,7 @@ func (c *Context) Send(data interface{}) (err error) {
 		if c.status == 0 {
 			c.status = http.StatusNoContent
 		}
-		_, err = c.Write(nil)
+		c.WriteHeader(c.status)
 	case string:
 		if c.ContentType == "" {
 			c.ContentType = "text/plain; charset=utf-8"

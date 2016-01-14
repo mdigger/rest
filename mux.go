@@ -2,8 +2,6 @@ package rest
 
 import (
 	"net/http"
-	"reflect"
-	"runtime"
 	"strings"
 )
 
@@ -39,7 +37,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			c.Send(e)
 			// выводим дамп с ошибкой
 			if accessLog != nil {
-				c.errorLog(e, true) // записываем ошибку в лог
+				c.errorLog(e, 2) // записываем ошибку в лог
 			}
 		}
 		c.close() // освобождаем по окончании
@@ -66,17 +64,10 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// запрашиваем подходящий обработчик
 	if handler, params := routers.lookup(path); handler != nil {
 		c.params = params // добавляем найденные параметры к контексту
-		// если включен режим отладки, то добавляем в контекст имя функции
-		// с обработчиком запроса, которое будет использоваться при выводе
-		// лога
-		if Debug && accessLog != nil {
-			c.SetData(dataSet(137), // магическое число 137 с приватным типом
-				runtime.FuncForPC(reflect.ValueOf(handler).Pointer()).Name())
-		}
 		// вызываем обработчик запроса
 		if err := handler(c); err != nil {
 			if accessLog != nil {
-				c.errorLog(err, false) // записываем ошибку в лог
+				c.errorLog(err, 1) // записываем ошибку в лог
 			}
 			// если ничего не отправляли, то отправляем эту ошибку
 			if !c.sended {

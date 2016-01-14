@@ -67,6 +67,7 @@ type Context struct {
 
 	response http.ResponseWriter         // ответ на запрос
 	params   []param                     // именованные параметры из пути запроса
+	path     string                      // путь запроса
 	status   int                         // код HTTP-ответа
 	sended   bool                        // флаг отосланного ответа
 	query    url.Values                  // параметры запроса в URL (кеш)
@@ -85,6 +86,7 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	c.Request = r
 	c.ContentType = ""
 	c.response = w
+	c.path = r.URL.Path
 	c.params = nil
 	c.status = 0
 	c.sended = false

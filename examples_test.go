@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/geotrace/rest"
+	"github.com/mdigger/rest"
 )
 
 func Example() {

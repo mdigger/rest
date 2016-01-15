@@ -9,6 +9,11 @@ import (
 	"github.com/mdigger/rest"
 )
 
+func init() {
+	rest.SetLogger(os.Stderr)
+	rest.Debug = true
+}
+
 func Example() {
 	var mux rest.ServeMux // инициализируем обработчик запросов
 	// добавляем описание обработчиков, задавая пути, методы и функции их обработки

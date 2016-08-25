@@ -13,6 +13,11 @@ type ServeMux struct {
 	// Описывает дополнительные заголовки HTTP-ответа, которые будут добавлены
 	// ко всем ответам, возвращаемым данным обработчиком
 	Headers map[string]string
+	// Описывает глобальную функцию для предварительной обработки всех запросов.
+	// Если в результате выполнения этой функции будет возвращена ошибка или
+	// отправлен ответ пользователю, то дальнейшая обработка запросов
+	// автоматически прекращается.
+	PreProcess Handler
 
 	routers map[string]*router // обработчики запросов по методам
 }
@@ -71,14 +76,27 @@ func (m ServeMux) Handler(c *Context) error {
 		}
 		c.path = strings.TrimPrefix(c.path, m.BasePath)
 	}
+	// выполняем функцию для предварительной обработки всех запросов,
+	// если она определена
+	if m.PreProcess != nil {
+		// выполняем функцию
+		if err := m.PreProcess(c); err != nil {
+			return err
+		}
+		// если ответ уже передан, то завершаем работу
+		if c.sended {
+			return nil
+		}
+	}
 	// получаем список обработчиков для данного метода
-	routers := m.routers[c.Request.Method]
-	// запрашиваем подходящий обработчик
-	if handler, params := routers.lookup(c.path); handler != nil {
-		// добавляем найденные параметры к контексту
-		c.params = append(c.params, params...)
-		// вызываем обработчик запроса
-		return handler(c)
+	if routers := m.routers[c.Request.Method]; routers != nil {
+		// запрашиваем подходящий обработчик
+		if handler, params := routers.lookup(c.path); handler != nil {
+			// добавляем найденные параметры к контексту
+			c.params = append(c.params, params...)
+			// вызываем обработчик запроса
+			return handler(c)
+		}
 	}
 	// обработчик для данного пути не найден
 	// собираем список методов, которые поддерживаются для данного пути
@@ -117,10 +135,11 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 		m.routers = make(map[string]*router, 9)
 	}
 	// получаем список обработчиков для данного метода
-	r := m.routers[strings.ToUpper(method)]
+	method = strings.ToUpper(method)
+	r := m.routers[method]
 	if r == nil {
 		r = new(router)
-		m.routers[strings.ToUpper(method)] = r
+		m.routers[method] = r
 	}
 	// добавляем обработчик для заданного метода и пути
 	if err := r.add(path, handler); err != nil {

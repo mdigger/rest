@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var JSONIndent = true // флаг для форматирования JSON при выводе.
+
 // JSON позволяет быстро описать данные в одноименном формате.
 type JSON map[string]interface{}
 
@@ -67,5 +69,9 @@ func (JSONCoder) Encode(c *Context, obj interface{}) error {
 	if c.ContentType == "" {
 		c.ContentType = "application/json; charset=utf-8"
 	}
-	return json.NewEncoder(c).Encode(obj)
+	enc := json.NewEncoder(c)
+	if JSONIndent {
+		enc.SetIndent("", "\t")
+	}
+	return enc.Encode(obj)
 }

@@ -81,6 +81,9 @@ func (r *router) add(url string, handler Handler) error {
 	// считаем количество параметров в определении пути
 	var params uint16
 	for i, value := range parts {
+		if value == "" {
+			continue
+		}
 		switch value[0] {
 		case byte(':'):
 			params++ // увеличиваем счетчик параметров

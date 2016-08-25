@@ -28,9 +28,15 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func Handlers(handlers ...Handler) Handler {
 	return func(c *Context) error {
 		for _, h := range handlers {
+			// выполняем обработчик
 			if err := h(c); err != nil {
-				return err
+				return err // в случае ошибки прерываем дальнейшую обработку
 			}
+			// если данные уже переданы, то дальнейшая обработка прерывается
+			if c.sended {
+				return nil
+			}
+
 		}
 		return nil
 	}

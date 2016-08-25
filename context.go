@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/klauspost/compress/gzip"
+	// "github.com/klauspost/compress/gzip"
 )
 
 var (

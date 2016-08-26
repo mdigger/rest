@@ -8,8 +8,6 @@ import (
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и
 // методами.
 type ServeMux struct {
-	// Позволяет задать базовый путь для всех запросов.
-	BasePath string
 	// Описывает дополнительные заголовки HTTP-ответа, которые будут добавлены
 	// ко всем ответам, возвращаемым данным обработчиком
 	Headers map[string]string
@@ -36,17 +34,13 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// если еще ничего не отсылали, то отсылаем эту ошибку
 			c.Send(e)
 			// выводим дамп с ошибкой
-			if accessLog != nil {
-				c.errorLog(e, 3) // записываем ошибку в лог
-			}
+			c.errorLog(e, 3) // записываем ошибку в лог
 		}
 		c.close() // освобождаем по окончании
 	}()
-	// вызываем обработку запроаса
+	// вызываем обработку запроса
 	if err := m.Handler(c); err != nil {
-		if accessLog != nil {
-			c.errorLog(err, 1) // записываем ошибку в лог
-		}
+		c.errorLog(err, 1) // записываем ошибку в лог
 		// если ничего не отправляли, то отправляем эту ошибку
 		if !c.sended {
 			c.Send(err) // возвращаемые ошибки игнорируем
@@ -67,14 +61,6 @@ func (m ServeMux) Handler(c *Context) error {
 		for key, value := range m.Headers {
 			header.Set(key, value)
 		}
-	}
-	// если задан базовый путь, то удаляем его из пути обработки
-	if m.BasePath != "" {
-		// проверяем, что путь начинается с базового пути
-		if !strings.HasPrefix(c.path, m.BasePath) {
-			return c.Send(ErrNotFound)
-		}
-		c.path = strings.TrimPrefix(c.path, m.BasePath)
 	}
 	// выполняем функцию для предварительной обработки всех запросов,
 	// если она определена
@@ -166,5 +152,3 @@ type (
 	// Methods позволяет описать обработчики для методов.
 	Methods map[string]Handler
 )
-
-type dataSet byte // для внутреннего использования с установкой данных

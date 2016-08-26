@@ -53,7 +53,7 @@ type router struct {
 
 // split нормализует путь и возвращает его в виде частей.
 func split(url string) []string {
-	return strings.Split(strings.Trim(path.Clean(url), "/"), "/")
+	return strings.SplitAfter(strings.TrimPrefix(path.Clean(url), "/"), "/")
 }
 
 // add добавляет новый обработчик для указанного пути. В описании пути можно
@@ -209,7 +209,7 @@ func (r *router) lookup(url string) (Handler, []param) {
 	return nil, nil
 }
 
-// path возвращает список элементов пути, связанный с данным обработчиком.
+// path возвращает список элементов пути, связанных с данным обработчиком.
 // Если обработчик связан с несколькими путями, то вернется самый первый.
 func (r *router) path(handler Handler) []string {
 	// получаем адрес обработчика

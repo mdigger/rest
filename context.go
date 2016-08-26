@@ -12,8 +12,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	// "github.com/klauspost/compress/gzip"
 )
 
 var (
@@ -32,7 +30,7 @@ var (
 	// Если размер превышает указанный, то возвращается ошибка. Если не хочется
 	// ограничений, то можно установить значение 0, тогда проверка производиться
 	// не будет.
-	Encoder Coder = NewJSONCoder(1 << 15) // 32 мегабайта
+	Encoder Coder = NewJSONCoder(1<<15, true) // 32 мегабайта и отступы
 	// EncodeError управляет форматом вывода ошибок: если флаг не взведен, то
 	// ошибки отдаются как текст. В противном случае описание ошибок
 	// кодируются с помощью Encoder и содержат статус и описание ошибки.
@@ -48,17 +46,6 @@ var (
 // этого, предоставляет свои методы для формирования ответа. Это позволяет
 // обойти некоторые скользкие моменты и, иногда, несколько упростить код.
 //
-// При отдаче ответа анализируются первые байты данных и на основании них
-// устанавливается тип ответа. Если вы хотите определить тип ответа
-// самостоятельно, то проще всего установить значение ContentType строкой с
-// описанием нужного типа.
-//
-// Есть два пути отослать в ответ ошибку: послать ее через Context.Send или
-// вернуть ее из обработчика. Результат, в конечном счете, будет приблизительно
-// одинаковый: разница только в том, что при возврате ошибки из обработчика,
-// она будет записана в лог, а в случае посылки ее через Send — нет. Чтобы не
-// путаться и не выбирать наилучший способ, просто рассматривайте возврат
-// ошибки из обработчика, как мягкий вариант паники (panic).
 type Context struct {
 	*http.Request        // HTTP запрос в разобранном виде
 	ContentType   string // тип информации в ответе
@@ -74,58 +61,6 @@ type Context struct {
 	started  time.Time                   // время начала обработки запроса
 	writer   io.Writer                   // интерфейс для записи ответов
 	compress bool                        // флаг, что мы включили сжатие
-}
-
-// newContext возвращает новый инициализированный контекст. В отличии от просто
-// создания нового контекста, вызов данного метода использует пул контекстов.
-func newContext(w http.ResponseWriter, r *http.Request) *Context {
-	c := contexts.Get().(*Context)
-	// очищаем его от возможных старых данных
-	c.Request = r
-	c.ContentType = ""
-	c.response = w
-	c.path = r.URL.Path
-	c.params = nil
-	c.status = 0
-	c.sended = false
-	c.query = nil
-	c.data = nil
-	c.size = 0
-	c.started = time.Now()
-	// если сжатие еще не установлено, но поддерживается клиентом, то включаем его
-	if Compress && w.Header().Get("Content-Encoding") == "" &&
-		strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		w.Header().Set("Content-Encoding", "gzip")
-		w.Header().Add("Vary", "Accept-Encoding")
-		gzw := gzips.Get().(*gzip.Writer)
-		gzw.Reset(w)
-		c.writer = gzw
-		c.compress = true
-	} else {
-		c.writer = w
-		c.compress = false
-	}
-	return c
-}
-
-// close возвращает контекст в пул используемых контекстов для дальнейшего
-// использования. Вызывается автоматически после того, как контекст перестает
-// использоваться.
-func (c *Context) close() {
-	// если ответ не был послан, то шлем ошибку
-	if !c.sended {
-		c.Status(http.StatusInternalServerError).Send(
-			http.StatusText(http.StatusInternalServerError))
-	}
-	// если инициализировано сжатие, то закрываем и освобождаем компрессор
-	if c.compress {
-		if gzw, ok := c.writer.(*gzip.Writer); ok {
-			gzw.Close()
-			gzips.Put(gzw)
-		}
-	}
-	c.log()         // выводим лог, если поддерживается
-	contexts.Put(c) // помещаем контекст обратно в пул
 }
 
 // Header возвращает HTTP-заголовки ответа. Используется для поддержки
@@ -245,12 +180,6 @@ func (c *Context) SetData(key, value interface{}) {
 	c.data[key] = value
 }
 
-// Bind разбирает данные запроса и заполняет ими указанный в параметре объект.
-// Разбор осуществляется с помощью Encoder.
-func (c *Context) Bind(obj interface{}) error {
-	return Encoder.Bind(c, obj)
-}
-
 // Эти ошибки обрабатываются при передаче их в метод Context.Send и
 // устанавливают соответствующий статус ответа.
 //
@@ -357,6 +286,12 @@ func (c *Context) Send(data interface{}) (err error) {
 	return
 }
 
+// Bind разбирает данные запроса и заполняет ими указанный в параметре объект.
+// Разбор осуществляется с помощью Encoder.
+func (c *Context) Bind(obj interface{}) error {
+	return Encoder.Bind(c, obj)
+}
+
 // Error отправляет указанный текст как описание ошибки. В зависимости от
 // флага EncodeError, данный текст будет отдан как описание или как JSON с кодом
 // статуса. В отличии от обычных ошибок, на данный текст не распространяется
@@ -376,6 +311,57 @@ func (c *Context) Error(code int, msg string) error {
 func (c *Context) Redirect(url string) error {
 	http.Redirect(c, c.Request, url, http.StatusFound)
 	return nil
+}
+
+// newContext возвращает новый инициализированный контекст. В отличии от просто
+// создания нового контекста, вызов данного метода использует пул контекстов.
+func newContext(w http.ResponseWriter, r *http.Request) *Context {
+	c := contexts.Get().(*Context)
+	// очищаем его от возможных старых данных
+	c.Request = r
+	c.ContentType = ""
+	c.response = w
+	c.path = r.URL.Path
+	c.params = nil
+	c.status = 0
+	c.sended = false
+	c.query = nil
+	c.data = nil
+	c.size = 0
+	c.started = time.Now()
+	// если сжатие еще не установлено, но поддерживается клиентом, то включаем его
+	if Compress && w.Header().Get("Content-Encoding") == "" &&
+		strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Add("Vary", "Accept-Encoding")
+		gzw := gzips.Get().(*gzip.Writer)
+		gzw.Reset(w)
+		c.writer = gzw
+		c.compress = true
+	} else {
+		c.writer = w
+		c.compress = false
+	}
+	return c
+}
+
+// close возвращает контекст в пул используемых контекстов для дальнейшего
+// использования. Вызывается автоматически после того, как контекст перестает
+// использоваться.
+func (c *Context) close() {
+	// если ответ не был послан, то шлем ошибку
+	if !c.sended {
+		c.Send(ErrInternalServerError)
+	}
+	// если инициализировано сжатие, то закрываем и освобождаем компрессор
+	if c.compress {
+		if gzw, ok := c.writer.(*gzip.Writer); ok {
+			gzw.Close()
+			gzips.Put(gzw)
+		}
+	}
+	c.log()         // выводим лог, если поддерживается
+	contexts.Put(c) // помещаем контекст обратно в пул
 }
 
 // пулы

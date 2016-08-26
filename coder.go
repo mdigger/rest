@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-var JSONIndent = true // флаг для форматирования JSON при выводе.
-
 // JSON позволяет быстро описать данные в одноименном формате.
 type JSON map[string]interface{}
 
@@ -20,12 +18,13 @@ type Coder interface {
 // JSONCoder осуществляет разбор запроса и кодирование ответа в формате JSON.
 type JSONCoder struct {
 	MaxBody int64 // максимально допустимый размер запроса
+	Indent  bool  // флаг форматированного вывода  JSON
 }
 
 // NewJSONCoder возвращает новый инициализированный Coder, поддерживающий
 // формат JSON.
-func NewJSONCoder(maxSize int64) *JSONCoder {
-	return &JSONCoder{MaxBody: maxSize}
+func NewJSONCoder(maxSize int64, indent bool) *JSONCoder {
+	return &JSONCoder{MaxBody: maxSize, Indent: indent}
 }
 
 // Bind разбирает данные запроса в формате JSON и заполняет ими указанный в
@@ -65,12 +64,12 @@ func (j JSONCoder) Bind(c *Context, obj interface{}) error {
 }
 
 // Encode кодирует и отправляет ответ с содержимым obj в формате JSON.
-func (JSONCoder) Encode(c *Context, obj interface{}) error {
+func (j JSONCoder) Encode(c *Context, obj interface{}) error {
 	if c.ContentType == "" {
 		c.ContentType = "application/json; charset=utf-8"
 	}
 	enc := json.NewEncoder(c)
-	if JSONIndent {
+	if j.Indent {
 		enc.SetIndent("", "\t")
 	}
 	return enc.Encode(obj)

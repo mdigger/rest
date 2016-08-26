@@ -65,8 +65,6 @@ func Example() {
 			"GET": rest.File("./favicon.ico"),
 		},
 	})
-	// можно сразу задать базовый путь для всех URL, используемых в обработчиках
-	mux.BasePath = "/api/v1"
 	// можно задать глобальные заголовки для всех ответов
 	mux.Headers = map[string]string{
 		"X-Powered-By": "My Server",

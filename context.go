@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -215,6 +216,20 @@ func (c *Context) Send(data interface{}) (err error) {
 	// в зависимости от типа данных, отдаем их разными способами
 	switch data := data.(type) {
 	case nil:
+		// удаляем заголовки сжатия, если они были установлены
+		if c.compress {
+			header := c.Header()
+			header.Del("Content-Encoding")
+			header.Del("Vary")
+			// сбрасываем сжатие и возвращаем стандартный ResponseWriter
+			if gzw, ok := c.writer.(*gzip.Writer); ok {
+				gzw.Reset(ioutil.Discard)
+				gzw.Close()
+				gzips.Put(gzw)
+				c.writer = c.response
+			}
+		}
+		// отдаем статус
 		if c.status == 0 {
 			c.status = http.StatusNoContent
 		}
@@ -356,6 +371,7 @@ func (c *Context) close() {
 	// если инициализировано сжатие, то закрываем и освобождаем компрессор
 	if c.compress {
 		if gzw, ok := c.writer.(*gzip.Writer); ok {
+			gzw.Reset(ioutil.Discard)
 			gzw.Close()
 			gzips.Put(gzw)
 		}

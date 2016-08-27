@@ -105,7 +105,7 @@ func (r *router) add(url string, handler Handler) error {
 		if r.static == nil {
 			r.static = make(map[string]Handler)
 		}
-		r.static[strings.Join(parts, "/")] = handler
+		r.static[strings.Join(parts, "")] = handler
 		return nil
 	}
 	// запоминаем максимальное количество элементов пути во всех определениях
@@ -129,7 +129,7 @@ func (r *router) lookup(url string) (Handler, []param) {
 	// сначала ищем среди статических путей; если статические пути не
 	// определены, то пропускаем проверку
 	if r.static != nil {
-		if handler, ok := r.static[strings.Join(parts, "/")]; ok {
+		if handler, ok := r.static[strings.Join(parts, "")]; ok {
 			return handler, nil
 		}
 	}
@@ -183,15 +183,17 @@ func (r *router) lookup(url string) (Handler, []param) {
 				switch part[0] {
 				case byte(':'): // это одиночный параметр
 					params = append(params, param{
-						Key:   part[1:], // имя будет без ':'
-						Value: parts[i], // значением берем элемент пути
+						// имя будет без ':' в начале и без возможного '/' в конце
+						Key: strings.TrimSuffix(part[1:], "/"),
+						// значением берем элемент пути без возможного '/' в конце
+						Value: strings.TrimSuffix(parts[i], "/"),
 					})
 					continue // переходим к следующему элементу пути
 				case byte('*'): // это параметр, который заберет все
 					params = append(params, param{
 						Key: part[1:], // исключаем '*' из имени
 						// добавляем весь оставшийся путь
-						Value: strings.Join(parts[i:], "/"),
+						Value: strings.Join(parts[i:], ""),
 					})
 					break params // больше ловить нечего — нашли
 				}

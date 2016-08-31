@@ -15,7 +15,7 @@ type ServeMux struct {
 	// Если в результате выполнения этой функции будет возвращена ошибка или
 	// отправлен ответ пользователю, то дальнейшая обработка запросов
 	// автоматически прекращается.
-	PreProcess Handler
+	PreHandler Handler
 
 	routers map[string]*router // обработчики запросов по методам
 }
@@ -64,9 +64,9 @@ func (m ServeMux) Handler(c *Context) error {
 	}
 	// выполняем функцию для предварительной обработки всех запросов,
 	// если она определена
-	if m.PreProcess != nil {
+	if m.PreHandler != nil {
 		// выполняем функцию
-		if err := m.PreProcess(c); err != nil {
+		if err := m.PreHandler(c); err != nil {
 			return err
 		}
 		// если ответ уже передан, то завершаем работу

@@ -27,18 +27,28 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // прерывается в том случае, если обработчик отдал ответ клиенту. С помощью
 // этой функции можно объединять несколько обработчиков в один.
 func Handlers(handlers ...Handler) Handler {
-	return func(c *Context) error {
-		for _, h := range handlers {
-			// выполняем обработчик
-			if err := h(c); err != nil {
-				return err // в случае ошибки прерываем дальнейшую обработку
-			}
-			// если данные уже переданы, то дальнейшая обработка прерывается
-			if c.sended {
-				break
-			}
-
-		}
+	switch len(handlers) {
+	case 0:
 		return nil
+	case 1:
+		return handlers[0]
+	default:
+		return func(c *Context) error {
+			for _, h := range handlers {
+				if h == nil {
+					continue // пропускаем пустые обработчики
+				}
+				// выполняем обработчик
+				if err := h(c); err != nil {
+					return err // в случае ошибки прерываем дальнейшую обработку
+				}
+				// если данные уже переданы, то дальнейшая обработка прерывается
+				if c.sended {
+					break
+				}
+
+			}
+			return nil
+		}
 	}
 }

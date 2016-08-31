@@ -111,7 +111,8 @@ func (m ServeMux) Handler(c *Context) error {
 //
 // Если количество элементов пути в path больше 32768 или параметр со звездочкой
 // используется не в самом последнем элементе пути, то возникает panic.
-func (m *ServeMux) Handle(method, path string, handler Handler) {
+func (m *ServeMux) Handle(method, path string, handlers ...Handler) {
+	handler := Handlers(handlers...)    // собираем все в один обработчик
 	if method == "" || handler == nil { // игнорируем пустые обработчики
 		return
 	}
@@ -142,6 +143,7 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 func (m *ServeMux) Handles(paths Paths, handlers ...Handler) {
 	for path, methods := range paths {
 		for method, handler := range methods {
+			// добавляем middleware ко всем обработчикам, если они определены
 			if len(handlers) > 0 {
 				handler = Handlers(append(handlers, handler)...)
 			}

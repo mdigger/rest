@@ -21,12 +21,6 @@ type JSONCoder struct {
 	Indent  bool  // флаг форматированного вывода  JSON
 }
 
-// NewJSONCoder возвращает новый инициализированный Coder, поддерживающий
-// формат JSON.
-func NewJSONCoder(maxSize int64, indent bool) *JSONCoder {
-	return &JSONCoder{MaxBody: maxSize, Indent: indent}
-}
-
 // Bind разбирает данные запроса в формате JSON и заполняет ими указанный в
 // параметре объект.
 //

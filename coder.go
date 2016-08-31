@@ -70,7 +70,7 @@ func (j JSONCoder) Encode(c *Context, obj interface{}) error {
 	}
 	enc := json.NewEncoder(c)
 	if j.Indent {
-		enc.SetIndent("", "  ")
+		enc.SetIndent("", "    ")
 	}
 	return enc.Encode(obj)
 }

@@ -136,9 +136,15 @@ func (m *ServeMux) Handle(method, path string, handler Handler) {
 // Handles добавляет сразу список обработчиков для нескольких путей и методов.
 // Это, по сути, просто удобный способ сразу определить большое количество
 // обработчиков, не вызывая каждый раз ServeMux.Handle.
-func (m *ServeMux) Handles(paths Paths) {
+//
+// Дополнительно можно указать список обработчиков, который будет выполнен
+// перед выполнение заданных.
+func (m *ServeMux) Handles(paths Paths, handlers ...Handler) {
 	for path, methods := range paths {
 		for method, handler := range methods {
+			if len(handlers) > 0 {
+				handler = Handlers(append(handlers, handler)...)
+			}
 			m.Handle(method, path, handler)
 		}
 	}

@@ -64,18 +64,20 @@ func Example() {
 			// для работы со статическими файлами определена специальная функция
 			"GET": rest.File("./favicon.ico"),
 		},
-	}, func(c *rest.Context) error {
-		// проверяем авторизацию для всех запросов, определенных выше
-		login, password, ok := c.BasicAuth()
-		if !ok {
-			c.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-			return c.Send(rest.ErrUnauthorized)
-		}
-		if login != "login" || password != "password" {
-			return c.Send(rest.ErrForbidden)
-		}
-		return nil
-	})
+	},
+		// добавляем проверку авторизации для всех запросов, определенных выше
+		func(c *rest.Context) error {
+			// проверяем авторизацию для всех запросов, определенных выше
+			login, password, ok := c.BasicAuth()
+			if !ok {
+				c.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+				return c.Send(rest.ErrUnauthorized)
+			}
+			if login != "login" || password != "password" {
+				return c.Send(rest.ErrForbidden)
+			}
+			return nil
+		})
 	// можно задать глобальные заголовки для всех ответов
 	mux.Headers = map[string]string{
 		"X-Powered-By": "My Server",

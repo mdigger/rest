@@ -39,3 +39,8 @@ func Data(data interface{}, contentType string) Handler {
 		return c.Send(data)
 	}
 }
+
+// NotImplemented возвращает ошибку ErrNotImplemented.
+func NotImplemented(*Context) error {
+	return ErrNotImplemented
+}

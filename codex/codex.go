@@ -1,3 +1,5 @@
+// Package codex соответствует интерфейсу rest.Coder и добавляет одновременную
+// поддержку форматов MsgPack, Cbor, Binc и JSON.
 package codex
 
 import (
@@ -17,9 +19,9 @@ var (
 )
 
 func init() {
-	hjson.Canonical = true           // сортировать ключи в словаре
-	hjson.Indent = -1                // отступ с табуляцией
-	rest.Encoder = NewCoder(1 << 15) // регистрируем при экспорте
+	hjson.Canonical = true        // сортировать ключи в словаре
+	hjson.Indent = -1             // отступ с табуляцией
+	rest.Encoder = Coder{1 << 15} // регистрируем при экспорте
 }
 
 // Coder поддерживает декодирование запроса и отсылку ответа в форматах JSON,
@@ -28,12 +30,8 @@ type Coder struct {
 	MaxBody int64 // максимально допустимый размер запроса
 }
 
-// NewCoder возвращает новый инициализированный Coder, поддерживающий
-// формат JSON, CBOR, MsgPack и Binc.
-func NewCoder(maxSize int64) *Coder {
-	return &Coder{MaxBody: maxSize}
-}
-
+// Bind разбирает содержимое запроса в формате MsgPack, Cbor, Binc или JSON
+// и сериализует его содержимое в объект.
 func (cdx Coder) Bind(c *rest.Context, obj interface{}) error {
 	r := c.Request // запрос
 	// если запрос превышает допустимый объем, то возвращаем ошибку
@@ -73,7 +71,9 @@ func (cdx Coder) Bind(c *rest.Context, obj interface{}) error {
 	return nil
 }
 
-// Encode кодирует и отправляет ответ с содержимым obj в формате JSON.
+// Encode кодирует и отправляет ответ с содержимым obj в формате MsgPack,
+// Cbor, Binc или JSON, в зависимости от предпочтений, определяемых на основании
+// заголовка запроса.
 func (Coder) Encode(c *rest.Context, obj interface{}) error {
 	mediatype := httpaccept.Negotiate(c.Request.Header.Get("Accept"), []string{
 		"application/cbor",

@@ -41,6 +41,10 @@ func Data(data interface{}, contentType string) Handler {
 }
 
 // NotImplemented возвращает ошибку ErrNotImplemented.
+//
+// Иногда при разработке руки сразу не доходят до того, чтобы написать
+// полноценный обработчик какого нибудь запроса. В этом случае очень выручает
+// данная функция, которую можно использовать вместо временной "заплатки".
 func NotImplemented(*Context) error {
 	return ErrNotImplemented
 }

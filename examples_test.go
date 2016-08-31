@@ -218,3 +218,7 @@ func ExampleFile() {
 func ExampleFiles() {
 	mux.Handle("GET", "/files/:name", rest.Files("./tmp/"))
 }
+
+func ExampleNotImplemented() {
+	mux.Handle("GET", "/data/:name", rest.NotImplemented)
+}

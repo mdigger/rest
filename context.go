@@ -355,6 +355,27 @@ func (c *Context) Redirect(url string) error {
 	return nil
 }
 
+// ServeContent просто вызывает http.ServeContent, передавая ему все
+// необходимые параметры. Т.к. стандартная функция не подразумевает возврата
+// какой либо ошибки, то и здесь ошибку вы не получите.
+func (c *Context) ServeContent(name string, modtime time.Time,
+	content io.ReadSeeker) error {
+	http.ServeContent(c, c.Request, name, modtime, content)
+	return nil
+}
+
+// ServeFile отдает содержимое файла с указанным именем, просто вызывая
+// функцию http.ServeFile. Ошибок не возвращает.
+func (c *Context) ServeFile(name string) error {
+	http.ServeFile(c, c.Request, name)
+	return nil
+}
+
+// SetCookie добавляет в ответ Cookie.
+func (c *Context) SetCookie(cookie *http.Cookie) {
+	http.SetCookie(c, cookie)
+}
+
 // newContext возвращает новый инициализированный контекст. В отличии от просто
 // создания нового контекста, вызов данного метода использует пул контекстов.
 func newContext(w http.ResponseWriter, r *http.Request) *Context {

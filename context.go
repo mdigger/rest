@@ -136,7 +136,12 @@ func (c *Context) Write(data []byte) (int, error) {
 // Flush отдает накопленный буфер с ответом. Используется для поддержки
 // интерфейса http.Flusher.
 func (c *Context) Flush() {
+	type Flusher interface {
+		Flush() error
+	}
 	if flusher, ok := c.writer.(http.Flusher); ok {
+		flusher.Flush()
+	} else if flusher, ok := c.writer.(Flusher); ok {
 		flusher.Flush()
 	}
 }

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
 	"path/filepath"
 )
@@ -47,4 +48,26 @@ func Data(data interface{}, contentType string) Handler {
 // данная функция, которую можно использовать вместо временной "заплатки".
 func NotImplemented(*Context) error {
 	return ErrNotImplemented
+}
+
+// BasicAuth проверяет HTTP Basic авторизацию пользователя. В качестве
+// аргумента передается функция, принимающая значения логина и пароля
+// пользователя, и возвращающая true, если пользователь успешно авторизован.
+// Вторым параметром передается строка, которая будет использоваться в
+// заголовке авторизации для обозначения раздела.
+func BasicAuth(auth func(login, password string) bool, realm string) Handler {
+	return func(c *Context) error {
+		login, password, ok := c.BasicAuth()
+		if auth(login, password) {
+			return nil
+		}
+		if ok {
+			return c.Send(ErrForbidden)
+		}
+		if realm == "" {
+			realm = "Restricted"
+		}
+		c.Header().Set("WWW-Authenticate", fmt.Sprintf("Basic realm=%q", realm))
+		return c.Send(ErrUnauthorized)
+	}
 }

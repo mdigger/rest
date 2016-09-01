@@ -18,18 +18,18 @@ func Redirect(url string) Handler {
 // File отдает на запрос содержимое файла с указанным именем.
 func File(name string) Handler {
 	return func(c *Context) error {
-		http.ServeFile(c, c.Request, name)
-		return nil
+		return c.ServeFile(name)
 	}
 }
 
 // Files отдает файлы по имени из указанного каталога. Имя файла задается
-// в пути в виде последнего именованного параметра.
+// в пути в виде последнего именованного параметра. Не выводит список файлов,
+// если запрос направлен на каталог файлов, в отличии от стандартной функции
+// http.FileServer.
 func Files(dir string) Handler {
 	return func(c *Context) error {
 		filename := filepath.Join(dir, c.params[len(c.params)-1].Value)
-		http.ServeFile(c, c.Request, filename)
-		return nil
+		return c.ServeFile(filename)
 	}
 }
 

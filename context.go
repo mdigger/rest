@@ -393,6 +393,7 @@ func (c *Context) close() {
 	// если инициализировано сжатие, то закрываем и освобождаем компрессор
 	if c.compress {
 		if gzw, ok := c.writer.(*gzip.Writer); ok {
+			gzw.Flush() // проталкиваем отдачу данных
 			gzw.Reset(ioutil.Discard)
 			gzw.Close()
 			gzips.Put(gzw)

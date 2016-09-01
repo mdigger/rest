@@ -36,7 +36,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// если еще ничего не отсылали, то отсылаем эту ошибку
 			c.Send(e)
 			// выводим дамп с ошибкой
-			c.errorLog(e, 3) // записываем ошибку в лог
+			c.errorLog(e, 4) // записываем ошибку в лог
 		}
 		c.close() // освобождаем по окончании
 	}()

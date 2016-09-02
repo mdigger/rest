@@ -1,10 +1,10 @@
 // Package expvar добавляет поддержку стандартной библиотеки expvar в rest.
 //
-// При подключении библиотеки к проекту автоматически стандартные обработчики
-// определенные в expvar, такие как "cmdline" и "memstats". Кроме этого, данная
-// библиотека так же регистрирует "goroutines", содержащее число запущенных
-// горутин. И "uptime" с количеством наносекунд, прошедших с момента старта
-// сервиса.
+// При подключении библиотеки к проекту автоматически добавляются стандартные
+// обработчики, определенные в expvar, такие как "cmdline" и "memstats". Кроме
+// этого, данная библиотека так же регистрирует "goroutines", содержащее число
+// запущенных горутин. И "uptime" с количеством наносекунд, прошедших с момента
+// старта сервиса.
 package expvar
 
 import (
@@ -16,26 +16,18 @@ import (
 	"github.com/mdigger/rest"
 )
 
-var (
-	// Path описывает путь обработчика для ExpVar. В отличии от стандартной
-	// библиотеки, вы можете изменить здесь этот путь.
-	Path      = "/debug/vars"
-	startTime = time.Now().UTC() // время запуска сервиса
-)
-
-// goroutines is an expvar.Func compliant wrapper for runtime.NumGoroutine function.
-func goroutines() interface{} {
-	return runtime.NumGoroutine()
-}
-
-// uptime is an expvar.Func compliant wrapper for uptime info.
-func uptime() interface{} {
-	return int64(time.Since(startTime))
-}
+// Path описывает путь обработчика для ExpVar. В отличии от стандартной
+// библиотеки, вы можете изменить здесь этот путь.
+var Path = "/debug/vars"
 
 func init() {
-	expvar.Publish("goroutines", expvar.Func(goroutines))
-	expvar.Publish("uptime", expvar.Func(uptime))
+	startTime := time.Now().UTC() // время запуска сервиса
+	expvar.Publish("uptime", expvar.Func(func() interface{} {
+		return int64(time.Since(startTime))
+	}))
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
 }
 
 // Register регистрирует обработчик ExpVar среди обработчиков данного

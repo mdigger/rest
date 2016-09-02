@@ -16,8 +16,9 @@ import (
 
 func TestCodex(t *testing.T) {
 	rest.Debug = true
+	rest.Compress = false
 	rest.SetLogger(os.Stderr)
-	rest.Encoder = NewCoder(0)
+	rest.Encoder = new(Coder)
 	var mux rest.ServeMux
 	mux.Handle("GET", "/test", func(c *rest.Context) error { return c.Send("test1") })
 	mux.Handle("POST", "/test", func(c *rest.Context) error { return c.Send(errors.New("test2")) })
@@ -48,10 +49,10 @@ func TestCodex(t *testing.T) {
 			t.Error(err)
 		}
 		dump, err = httputil.DumpResponse(resp, true)
+		resp.Body.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 		fmt.Printf("%s\n%s\n", dump, strings.Repeat("-", 40))
-		resp.Body.Close()
 	}
 }

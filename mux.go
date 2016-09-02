@@ -28,7 +28,7 @@ type ServeMux struct {
 // В процессе обработки запроса отслеживаются возвращаемые ошибки и
 // перехватываются возможные вызовы panic. Если ответ на запрос еще не
 // отправлялся, то в этих случаях в ответ будет отправлена ошибка.
-func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := newContext(w, r) // формируем контекст для ответа
 	defer func() {
 		// перехватываем panic, если она случилась
@@ -56,7 +56,7 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // для других методов, то возвращается статус http.StatusMethodNotAllowed и в
 // заголовке передается список методов, которые можно применить к данному пути.
 // В противном случае возвращается статус http.StatusNotFound.
-func (m *ServeMux) Handler(c *Context) error {
+func (m ServeMux) Handler(c *Context) error {
 	// добавляем заголовки, если они определены
 	header := c.response.Header()
 	if len(m.Headers) > 0 {

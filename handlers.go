@@ -59,6 +59,7 @@ func BasicAuth(auth func(login, password string) bool, realm string) Handler {
 	return func(c *Context) error {
 		login, password, ok := c.BasicAuth()
 		if auth(login, password) {
+			c.SetData(restDataAuthLogin, login)
 			return nil
 		}
 		if ok {
@@ -71,3 +72,18 @@ func BasicAuth(auth func(login, password string) bool, realm string) Handler {
 		return c.Send(ErrUnauthorized)
 	}
 }
+
+// GetAuthLogin возвращает сохраненный при проверке авторизации с помощью
+// BasicAuth логин пользователя. В противном случае возвращает пустую строку.
+func GetAuthLogin(c *Context) string {
+	return c.Data(restDataAuthLogin).(string)
+}
+
+// restDataType используется для сохранения данных в контексте запроса.
+type restDataType byte
+
+const (
+	_ restDataType = iota
+	// используется для сохранения логина авторизованного пользователя
+	restDataAuthLogin
+)

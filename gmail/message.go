@@ -7,7 +7,7 @@ import (
 	"mime"
 	"text/template"
 
-	gm "google.golang.org/api/gmail/v1"
+	"google.golang.org/api/gmail/v1"
 )
 
 // messageTeplate содержит разобранный и готовый для использования шаблон
@@ -61,7 +61,7 @@ func (m Message) Send() error {
 	// кодируем содержимое сообщения в формат Base64
 	body := base64.RawURLEncoding.EncodeToString(text)
 	// формируем сообщение в формате GMail
-	var gmailMessage = &gm.Message{Raw: body}
+	var gmailMessage = &gmail.Message{Raw: body}
 	// отправляем сообщение на сервер GMail
 	_, err = gmailService.Users.Messages.Send("me", gmailMessage).Do()
 	return err // возвращаем статус отправки сообщения

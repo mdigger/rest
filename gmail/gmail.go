@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	gm "google.golang.org/api/gmail/v1"
+	"google.golang.org/api/gmail/v1"
 )
 
 // RequestMessage содержит сообщение, которое будет выведено для запроса
@@ -19,7 +19,7 @@ import (
 var RequestMessage = "Go to the following link in your browser then type the authorization code:"
 
 // gmailService содержит указатель на инициализированный сервис GMail.
-var gmailService *gm.Service
+var gmailService *gmail.Service
 
 // Init инициализирует сервис GMail. В процессе инициализации читается файл
 // конфигурации, который должен быть создан и получен через консоль Google
@@ -40,7 +40,7 @@ func Init(config, token string) error {
 		return err
 	}
 	// инициализируем сервис (gmail.MailGoogleComScope)
-	cfg, err := google.ConfigFromJSON(b, gm.GmailSendScope)
+	cfg, err := google.ConfigFromJSON(b, gmail.GmailSendScope)
 	if err != nil {
 		return err
 	}
@@ -81,6 +81,6 @@ func Init(config, token string) error {
 		file.Close()
 	}
 	// инициализируем сервис для доступа к GMail
-	gmailService, err = gm.New(cfg.Client(context.Background(), oauthToken))
+	gmailService, err = gmail.New(cfg.Client(context.Background(), oauthToken))
 	return err
 }

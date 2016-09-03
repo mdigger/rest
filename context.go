@@ -67,17 +67,24 @@ type Context struct {
 	*http.Request        // HTTP запрос в разобранном виде
 	ContentType   string // тип информации в ответе
 
-	response http.ResponseWriter         // ответ на запрос
-	params   []param                     // именованные параметры из пути запроса
-	path     string                      // путь запроса
-	status   int                         // код HTTP-ответа
-	sended   bool                        // флаг отосланного ответа
-	query    url.Values                  // параметры запроса в URL (кеш)
-	data     map[interface{}]interface{} // дополнительные данные пользователя
-	size     int                         // размер переданных данных
-	started  time.Time                   // время начала обработки запроса
-	writer   io.Writer                   // интерфейс для записи ответов
-	compress bool                        // флаг, что мы включили сжатие
+	response http.ResponseWriter // ответ на запрос
+	params   []param             // именованные параметры из пути запроса
+	path     string              // путь запроса
+	status   int                 // код HTTP-ответа
+	sended   bool                // флаг отосланного ответа
+	query    url.Values          // параметры запроса в URL (кеш)
+	size     int                 // размер переданных данных
+	started  time.Time           // время начала обработки запроса
+	writer   io.Writer           // интерфейс для записи ответов
+	compress bool                // флаг, что мы включили сжатие
+}
+
+// GetHeader позволяет получить доступ к заголовкам http,Request, которые
+// оказались скрытыми из-за объединения запроса и ответа в одном объекте.
+// Так что это просто короткий путь доступа к ним, чтобы не писать что-то типа
+// c.Request.Header.Get("Context-Type").
+func (c *Context) GetHeader(key string) string {
+	return c.Request.Header.Get(key)
 }
 
 // Header возвращает HTTP-заголовки ответа. Используется для поддержки
@@ -182,10 +189,8 @@ func (c *Context) Param(key string) string {
 // указанным ключем. Обычно эти данные используются, когда необходимо передать
 // их между несколькими обработчиками.
 func (c *Context) Data(key interface{}) interface{} {
-	if c.data == nil {
-		return nil
-	}
-	return c.data[key]
+	// возвращаем данные из контекста запроса
+	return c.Request.Context().Value(key)
 }
 
 // SetData сохраняет пользовательские данные в контексте запроса с указанным
@@ -196,10 +201,10 @@ func (c *Context) Data(key interface{}) interface{} {
 // это гарантированно обезопасит от случайного доступа к ним. Но строки тоже
 // поддерживаются. :)
 func (c *Context) SetData(key, value interface{}) {
-	if c.data == nil {
-		c.data = make(map[interface{}]interface{})
-	}
-	c.data[key] = value
+	// инициализируем новый Context, добавив в него наш ключ и значение
+	ctx := context.WithValue(c.Request.Context(), key, value)
+	// подменяем запрос на новый, с сохраненным контекстом
+	c.Request = c.Request.WithContext(ctx)
 }
 
 // Эти ошибки обрабатываются при передаче их в метод Context.Send и
@@ -388,7 +393,6 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	c.status = 0
 	c.sended = false
 	c.query = nil
-	c.data = nil
 	c.size = 0
 	c.started = time.Now()
 	// если сжатие еще не установлено, но поддерживается клиентом, то включаем его

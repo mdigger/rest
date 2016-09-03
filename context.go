@@ -3,6 +3,7 @@ package rest
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -61,9 +62,7 @@ var (
 //
 // Однако и без некоторой ложки дегтя не обошлось: функция Context.Header()
 // скрывает доступ заголовкам запроса. Поэтому приходится явно прописывать,
-// что необходимо обращение именно к ним:
-//
-// 	ctype := c.Request.Header.Get("Context-Type")
+// что необходимо обращение именно к ним или использовать метод GetHeader().
 type Context struct {
 	*http.Request        // HTTP запрос в разобранном виде
 	ContentType   string // тип информации в ответе

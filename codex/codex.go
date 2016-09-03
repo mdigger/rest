@@ -75,7 +75,7 @@ func (cdx Coder) Bind(c *rest.Context, obj interface{}) error {
 // Cbor, Binc или JSON, в зависимости от предпочтений, определяемых на основании
 // заголовка запроса.
 func (Coder) Encode(c *rest.Context, obj interface{}) error {
-	mediatype := httpaccept.Negotiate(c.Request.Header.Get("Accept"), []string{
+	mediatype := httpaccept.Negotiate(c.GetHeader("Accept"), []string{
 		"application/cbor",
 		"application/msgpack",
 		"application/x-msgpack",

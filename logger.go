@@ -60,10 +60,10 @@ func (c *Context) log() {
 	// время окончания обработки и вывода в лог
 	buf.WriteString(stop.Format("2006/01/02 15:04:05"))
 	// адрес пользователя
-	remoteAddr := c.Request.Header.Get("X-Real-IP")
+	remoteAddr := c.GetHeader("X-Real-IP")
 	// Если IP-адрес путой, то смотрим на адрес proxy
 	if remoteAddr == "" {
-		remoteAddr = c.Request.Header.Get("X-Forwarded-For")
+		remoteAddr = c.GetHeader("X-Forwarded-For")
 	}
 	// Если и этот адрес не указан, то читаем адрес socket
 	if remoteAddr == "" {

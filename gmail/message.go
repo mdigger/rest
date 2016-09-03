@@ -31,7 +31,7 @@ type Message struct {
 	Body    string // основное содержимое письма
 }
 
-// GetText преобразует сообщения по шаблону в текст и возвращает его.
+// Bytes преобразует сообщения по шаблону в текст и возвращает его.
 func (m Message) Bytes() ([]byte, error) {
 	var buf bytes.Buffer
 	if err := messageTeplate.Execute(&buf, m); err != nil {

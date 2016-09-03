@@ -40,9 +40,9 @@ func (m Message) Bytes() ([]byte, error) {
 	return buf.Bytes(), nil // возвращаем получившийся текст
 }
 
-// ErrGMailServiceNotInitialized описывает ошибку не инициализированного
+// ErrServiceNotInitialized описывает ошибку не инициализированного
 // сервиса GMail.
-var ErrGMailServiceNotInitialized = errors.New("gmail service not initialized")
+var ErrServiceNotInitialized = errors.New("gmail service not initialized")
 
 // Send отправляет сообщение через GMail.
 //
@@ -51,7 +51,7 @@ var ErrGMailServiceNotInitialized = errors.New("gmail service not initialized")
 // потребовать ввода кода ответа при первой инициализации сервиса.
 func (m Message) Send() error {
 	if gmailService == nil || gmailService.Users == nil {
-		return ErrGMailServiceNotInitialized
+		return ErrServiceNotInitialized
 	}
 
 	text, err := m.Bytes() // получаем текст сформированного сообщения

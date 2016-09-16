@@ -156,6 +156,7 @@ func (c *Context) Flush() {
 // Hijack используется для перехвата управления над ответами сервера. Например,
 // для поддержки Websocket.
 func (c *Context) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	c.sended = true // считаем, что все уже отправлено
 	return c.response.(http.Hijacker).Hijack()
 }
 

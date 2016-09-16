@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -150,6 +152,12 @@ func (c *Context) Flush() {
 	} else if flusher, ok := c.writer.(Flusher); ok {
 		flusher.Flush()
 	}
+}
+
+// Hijack используется для перехвата управления над ответами сервера. Например,
+// для поддержки Websocket.
+func (c *Context) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return c.response.(http.Hijacker).Hijack()
 }
 
 // Status устанавливает код HTTP-ответа, который будет отправлен сервером. Вызов

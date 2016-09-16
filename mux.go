@@ -136,6 +136,14 @@ func (m *ServeMux) Handle(method, path string, handlers ...Handler) {
 	}
 }
 
+// Handle создает новый ServeMux, добавляет в него обработчики для указанного
+// пути и метода, и возвращает его.
+func Handle(method, path string, handlers ...Handler) *ServeMux {
+	var mux ServeMux
+	mux.Handle(method, path, handlers...)
+	return &mux
+}
+
 // Handles добавляет сразу список обработчиков для нескольких путей и методов.
 // Это, по сути, просто удобный способ сразу определить большое количество
 // обработчиков, не вызывая каждый раз ServeMux.Handle.

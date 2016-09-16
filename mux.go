@@ -154,6 +154,14 @@ func (m *ServeMux) Handles(paths Paths, handlers ...Handler) {
 	}
 }
 
+// Handles возвращает новый инициализированный ServeMux c заданными
+// обработчиками HTTP-запросов.
+func Handles(paths Paths, handlers ...Handler) *ServeMux {
+	var mux ServeMux
+	mux.Handles(paths, handlers...)
+	return &mux
+}
+
 type (
 	// Paths позволяет описать сразу несколько обработчиков для разных путей
 	// и методов: ключем для данного словаря как раз являются пути запросов.

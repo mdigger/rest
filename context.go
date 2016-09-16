@@ -296,34 +296,36 @@ func (c *Context) Send(data interface{}) (err error) {
 	// то отдаем ошибку
 	if err != nil && !c.sended {
 		// устанавливаем статус, в зависимости от ошибки
-		switch err {
-		case ErrBadRequest: // 400
-			c.status = http.StatusBadRequest
-		case ErrUnauthorized: // 401
-			c.status = http.StatusUnauthorized
-		case ErrForbidden: // 403
-			c.status = http.StatusForbidden
-		case ErrNotFound: // 404
-			c.status = http.StatusNotFound
-		case ErrLengthRequired: // 411
-			c.status = http.StatusLengthRequired
-		case ErrRequestEntityTooLarge: // 413
-			c.status = http.StatusRequestEntityTooLarge
-		case ErrUnsupportedMediaType: // 415
-			c.status = http.StatusUnsupportedMediaType
-		case ErrInternalServerError: // 500
-			c.status = http.StatusInternalServerError
-		case ErrNotImplemented: // 501
-			c.status = http.StatusNotImplemented
-		case ErrServiceUnavailable: // 503
-			c.status = http.StatusServiceUnavailable
-		default:
-			if os.IsNotExist(err) {
-				c.status = http.StatusNotFound
-			} else if os.IsPermission(err) {
+		if c.status == 0 {
+			switch err {
+			case ErrBadRequest: // 400
+				c.status = http.StatusBadRequest
+			case ErrUnauthorized: // 401
+				c.status = http.StatusUnauthorized
+			case ErrForbidden: // 403
 				c.status = http.StatusForbidden
-			} else {
+			case ErrNotFound: // 404
+				c.status = http.StatusNotFound
+			case ErrLengthRequired: // 411
+				c.status = http.StatusLengthRequired
+			case ErrRequestEntityTooLarge: // 413
+				c.status = http.StatusRequestEntityTooLarge
+			case ErrUnsupportedMediaType: // 415
+				c.status = http.StatusUnsupportedMediaType
+			case ErrInternalServerError: // 500
 				c.status = http.StatusInternalServerError
+			case ErrNotImplemented: // 501
+				c.status = http.StatusNotImplemented
+			case ErrServiceUnavailable: // 503
+				c.status = http.StatusServiceUnavailable
+			default:
+				if os.IsNotExist(err) {
+					c.status = http.StatusNotFound
+				} else if os.IsPermission(err) {
+					c.status = http.StatusForbidden
+				} else {
+					c.status = http.StatusInternalServerError
+				}
 			}
 		}
 		// В зависимости от флага Debug, отдаем либо текст ошибки, либо статуса

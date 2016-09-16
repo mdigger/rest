@@ -160,6 +160,11 @@ func (c *Context) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return c.response.(http.Hijacker).Hijack()
 }
 
+// CloseNotify поддерживает интерфейс http.CloseNotifier.
+func (c *Context) CloseNotify() <-chan bool {
+	return c.response.(http.CloseNotifier).CloseNotify()
+}
+
 // Status устанавливает код HTTP-ответа, который будет отправлен сервером. Вызов
 // данного метода не приводит к немедленной отправке ответа, а только
 // устанавливает внутренний статус. Статус должен быть в диапазоне от 200 до

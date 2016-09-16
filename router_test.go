@@ -1,11 +1,44 @@
 package rest
 
 import (
+	"fmt"
+	"log"
 	"reflect"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/kr/pretty"
 )
+
+func TestRouter3(t *testing.T) {
+	log.SetFlags(log.Lshortfile)
+	var r router
+	var err error
+	h1 := func(c *Context) error { return nil }
+	err = r.add("/:name/test", h1)
+	if err != nil {
+		t.Error(err)
+	}
+	h2 := func(c *Context) error { return nil }
+	err = r.add("/:name/store/*filename", h2)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(r.path(h1))
+	fmt.Println(r.path(h2))
+	pretty.Println(r)
+	handler, params := r.lookup("/name1/test")
+	// fmt.Println(r.path(handler), params)
+	fmt.Println(params)
+	handler, params = r.lookup("/name2/store")
+	// fmt.Println(r.path(handler), params)
+	fmt.Println(params)
+	handler, params = r.lookup("/name3/store/test")
+	// fmt.Println(r.path(handler), params)
+	fmt.Println(params)
+	_ = handler
+}
 
 func TestRouter(t *testing.T) {
 	tests := []struct {

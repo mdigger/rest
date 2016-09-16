@@ -147,9 +147,8 @@ func (c *Context) Flush() {
 	type Flusher interface {
 		Flush() error
 	}
-	if flusher, ok := c.writer.(http.Flusher); ok {
-		flusher.Flush()
-	} else if flusher, ok := c.writer.(Flusher); ok {
+	c.response.(http.Flusher).Flush()
+	if flusher, ok := c.writer.(Flusher); ok {
 		flusher.Flush()
 	}
 }

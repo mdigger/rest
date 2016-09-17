@@ -1,22 +1,237 @@
 package rest
 
 import (
-	"fmt"
+	"errors"
+	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/mdigger/router"
 )
 
-func TestContext(t *testing.T) {
-	r, err := http.NewRequest("GET", "/test?akdjf#sdf", nil)
-	if err != nil {
-		t.Fatal(err)
+func NewContext(url string, compress bool) *Context {
+	r, _ := http.NewRequest("GET", url, nil)
+	if compress {
+		r.Header.Set("Accept-Encoding", "gzip")
 	}
 	w := httptest.NewRecorder()
-	c := newContext(w, r)
+	return newContext(w, r)
+}
+
+func TestContext(t *testing.T) {
+	Compress = true
+	Debug = true
+	c := NewContext("/test?test=test#sdf", true)
+	defer c.close()
+	c.Request.Header.Set("Accept-Encoding", "gzip")
+
 	header := c.Header()
 	header.Set("test", "32")
-	fmt.Println(c.Header().Get("test"))
+
+	c.SetData("test", "value")
+	if c.Data("test").(string) != "value" {
+		t.Error("bad data set and get")
+	}
+	if err := c.Error(401, "test message"); err != nil {
+		t.Error(err)
+	}
+	if c.Param("test") != "test" {
+		t.Error("bad param")
+	}
+	c.WriteHeader(600)
+	c.Write([]byte("test"))
+	c.Flush()
+	c.Send(nil)
+}
+
+func TestContext2(t *testing.T) {
+	c := NewContext("/test", false)
+	c.WriteHeader(600)
 	c.close()
 
+	c = NewContext("/test", false)
+	c.WriteHeader(0)
+	c.close()
+
+	Compress = false
+	c = NewContext("/test", false)
+	c.Write([]byte("<html><h1>test</h1></html>"))
+	c.Flush()
+	c.close()
+
+	Compress = true
+	c = NewContext("/test", true)
+	c.Write([]byte("plain text"))
+	c.Flush()
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send(nil)
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send([]byte("test"))
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send(errors.New("test"))
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send(strings.NewReader("test"))
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send("<html><h1>test</h1></html>")
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send("")
+	c.close()
+
+	Compress = false
+	c = NewContext("/test", true)
+	c.Send([]byte("<html><h1>test</h1></html>"))
+	c.Flush()
+	c.close()
+
+	Compress = true
+	c = NewContext("/test", true)
+	c.Send("<html><h1>test</h1></html>")
+	c.Flush()
+	c.close()
+
+	c = NewContext("/test", true)
+	c.Send(nil)
+	c.Flush()
+	c.close()
+
+	for _, err := range []error{
+		errors.New("text"),
+		ErrForbidden,
+		ErrUnauthorized,
+		ErrBadRequest,
+		ErrLengthRequired,
+		ErrNotFound,
+		ErrNotImplemented,
+		ErrServiceUnavailable,
+		ErrDataAlreadySent,
+		ErrInternalServerError,
+		ErrUnsupportedMediaType,
+		ErrRequestEntityTooLarge,
+		io.EOF,
+		io.ErrClosedPipe,
+		io.ErrNoProgress,
+		io.ErrShortWrite,
+		io.ErrUnexpectedEOF,
+		os.ErrExist,
+		os.ErrInvalid,
+		os.ErrPermission,
+		os.ErrNotExist,
+	} {
+		c = NewContext("/test", true)
+		Debug = (rand.Intn(10) < 5)
+		EncodeError = (rand.Intn(10) >= 5)
+		c.Send(err)
+		c.close()
+
+		c = NewContext("/test", true)
+		Debug = (rand.Intn(10) < 5)
+		EncodeError = (rand.Intn(10) >= 5)
+		c.Error(200+rand.Intn(301), err.Error())
+		c.close()
+	}
+
+	c = NewContext("/test", true)
+	c.GetHeader("Context-Type")
+	c.Redirect("/")
+	c.close()
+
+	c = NewContext("/test", true)
+	c.SetCookie(&http.Cookie{Name: "test", Value: "test"})
+	c.ServeFile("context_test.go")
+	c.close()
+
+	c = NewContext("/test", true)
+	c.ServeContent("test.txt", time.Now(), strings.NewReader("content"))
+	c.Send(errors.New("text"))
+	c.close()
+
+	// c = NewContext("/test", true)
+	// c.Send("text")
+	// go func() {
+	// 	<-c.CloseNotify()
+	// }()
+	// c.close()
+
+	// c = NewContext("/test", true)
+	// c.Hijack()
+	// c.Send("text")
+	// c.close()
+
+	c = NewContext("/test", true)
+	c.close()
+}
+
+func TestBind(t *testing.T) {
+	jsontext := `{"test": "name"}`
+	r, _ := http.NewRequest("POST", "/test", strings.NewReader(jsontext))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	c := newContext(w, r)
+	obj := make(map[string]string)
+	err := c.Bind(&obj)
+	if err != nil {
+		t.Error(err)
+	}
+	c.close()
+
+	r, _ = http.NewRequest("POST", "/test", strings.NewReader(jsontext))
+	w = httptest.NewRecorder()
+	c = newContext(w, r)
+	obj = make(map[string]string)
+	err = c.Bind(&obj)
+	if err != ErrUnsupportedMediaType {
+		t.Error("Error:", err)
+	}
+	c.close()
+
+	r, _ = http.NewRequest("POST", "/test", strings.NewReader("{"+jsontext))
+	r.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	c = newContext(w, r)
+	obj = make(map[string]string)
+	err = c.Bind(&obj)
+	if err != ErrBadRequest {
+		t.Error("Error:", err)
+	}
+	c.close()
+
+	r, _ = http.NewRequest("POST", "/test", strings.NewReader(strings.Repeat("\"", 1<<16)))
+	r.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	c = newContext(w, r)
+	obj = make(map[string]string)
+	err = c.Bind(&obj)
+	if err != ErrRequestEntityTooLarge {
+		t.Error("Error:", err)
+	}
+	c.close()
+}
+
+func TestParams(t *testing.T) {
+	c := NewContext("/test", true)
+	c.params = router.Params{
+		{"name", "value"},
+	}
+	if c.Param("name") != "value" {
+		t.Error("bad params")
+	}
+	c.Send(errors.New("text"))
+	c.close()
 }

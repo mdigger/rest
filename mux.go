@@ -3,23 +3,18 @@ package rest
 import (
 	"net/http"
 	"strings"
+
+	"github.com/mdigger/router"
 )
 
 // ServeMux описывает список обработчиков, ассоциированных с путями запроса и
-// методами.
+// методами. По сути, это замена http.ServeMux с поддержкой параметров в пути
+// запроса.
 type ServeMux struct {
 	// Описывает дополнительные заголовки HTTP-ответа, которые будут добавлены
 	// ко всем ответам, возвращаемым данным обработчиком
 	Headers map[string]string
-
-	// Описывает глобальную функцию для предварительной обработки всех запросов.
-	// Если в результате выполнения этой функции будет возвращена ошибка или
-	// отправлен ответ пользователю, то дальнейшая обработка запросов
-	// автоматически прекращается. Эта функция вызывается перед ЛЮБЫМ
-	// обработчиком.
-	PreHandler Handler
-
-	routers map[string]*router // обработчики запросов по методам
+	routers map[string]*router.Paths // обработчики запросов по методам
 }
 
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler. Таким образом,
@@ -28,21 +23,21 @@ type ServeMux struct {
 // В процессе обработки запроса отслеживаются возвращаемые ошибки и
 // перехватываются возможные вызовы panic. Если ответ на запрос еще не
 // отправлялся, то в этих случаях в ответ будет отправлена ошибка.
-func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := newContext(w, r) // формируем контекст для ответа
 	defer func() {
 		// перехватываем panic, если она случилась
 		if e := recover(); e != nil {
 			// если еще ничего не отсылали, то отсылаем эту ошибку
 			c.Send(e)
-			// выводим дамп с ошибкой
-			c.errorLog(e, 4) // записываем ошибку в лог
+			// // выводим дамп с ошибкой
+			// c.errorLog(e, 4) // записываем ошибку в лог
 		}
 		c.close() // освобождаем по окончании
 	}()
 	// вызываем обработку запроса
 	if err := m.Handler(c); err != nil {
-		c.errorLog(err, 1) // записываем ошибку в лог
+		// c.errorLog(err, 1) // записываем ошибку в лог
 		// если ничего не отправляли, то отправляем эту ошибку
 		if !c.sended {
 			c.Send(err) // возвращаемые ошибки игнорируем
@@ -56,7 +51,7 @@ func (m ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // для других методов, то возвращается статус http.StatusMethodNotAllowed и в
 // заголовке передается список методов, которые можно применить к данному пути.
 // В противном случае возвращается статус http.StatusNotFound.
-func (m ServeMux) Handler(c *Context) error {
+func (m *ServeMux) Handler(c *Context) error {
 	// добавляем заголовки, если они определены
 	header := c.response.Header()
 	if len(m.Headers) > 0 {
@@ -64,33 +59,21 @@ func (m ServeMux) Handler(c *Context) error {
 			header.Set(key, value)
 		}
 	}
-	// выполняем функцию для предварительной обработки всех запросов,
-	// если она определена
-	if m.PreHandler != nil {
-		// выполняем функцию
-		if err := m.PreHandler(c); err != nil {
-			return err
-		}
-		// если ответ уже передан, то завершаем работу
-		if c.sended {
-			return nil
-		}
-	}
 	// получаем список обработчиков для данного метода
 	if routers := m.routers[c.Request.Method]; routers != nil {
 		// запрашиваем подходящий обработчик
-		if handler, params := routers.lookup(c.path); handler != nil {
+		if handler, params := routers.Lookup(c.path); handler != nil {
 			// добавляем найденные параметры к контексту
 			c.params = append(c.params, params...)
 			// вызываем обработчик запроса
-			return handler(c)
+			return handler.(Handler)(c)
 		}
 	}
 	// обработчик для данного пути не найден
 	// собираем список методов, которые поддерживаются для данного пути
 	methods := make([]string, 0, len(m.routers))
 	for method, handlers := range m.routers {
-		if handler, _ := handlers.lookup(c.path); handler != nil {
+		if handler, _ := handlers.Lookup(c.path); handler != nil {
 			methods = append(methods, method)
 		}
 	}
@@ -121,17 +104,17 @@ func (m *ServeMux) Handle(method, path string, handlers ...Handler) {
 	// если список обработчиков еще не инициализирован, то инициализируем его
 	if m.routers == nil {
 		// обычно используется не более 9 методов HTTP
-		m.routers = make(map[string]*router, 9)
+		m.routers = make(map[string]*router.Paths, 9)
 	}
 	// получаем список обработчиков для данного метода
 	method = strings.ToUpper(method)
 	r := m.routers[method]
 	if r == nil {
-		r = new(router)
+		r = new(router.Paths)
 		m.routers[method] = r
 	}
 	// добавляем обработчик для заданного метода и пути
-	if err := r.add(path, handler); err != nil {
+	if err := r.Add(path, handler); err != nil {
 		panic(err) // обработчик нас не устраивает по каким-то причинам
 	}
 }

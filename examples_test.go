@@ -10,12 +10,11 @@ import (
 )
 
 func init() {
-	rest.SetLogger(os.Stderr)
 	rest.Debug = true
 }
 
 func Example() {
-	var mux rest.ServeMux // инициализируем обработчик запросов
+	var mux = new(rest.ServeMux) // инициализируем обработчик запросов
 	// добавляем описание обработчиков, задавая пути, методы и функции их обработки
 	mux.Handles(rest.Paths{
 		// при задании путей можно использовать именованные параметры с ':'
@@ -134,7 +133,7 @@ func ExampleContext_Bind() error {
 	return c.Send(data)
 }
 
-var mux rest.ServeMux
+var mux = new(rest.ServeMux)
 
 func ExampleHandler_ServeHTTP() {
 	http.ListenAndServe(":8080",
@@ -187,7 +186,7 @@ var (
 )
 
 func ExampleServeMux_Handles() {
-	var mux rest.ServeMux
+	var mux = new(rest.ServeMux)
 	mux.Handles(rest.Paths{
 		"/user/:id": {
 			"GET":  user.get,

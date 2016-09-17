@@ -2,55 +2,19 @@ package rest
 
 import (
 	"bufio"
-	"bytes"
 	"compress/gzip"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
-)
 
-// Глобальные переменные библиотеки, позволяющие переопределять особенности
-// ее поведения. Сюда вынесено все, что может быть использовано библиотекой
-// глобально, а не в контексте одного запроса, и что может потребовать
-// переопределения пользователем.
-//
-// В частности, если появится необходимость использования вместо формата JSON,
-// например, MsgPacл, то это можно достаточно легко осуществить, просто заменим
-// Encoder соответствующим обработчиком. Кстати, подпроект codex как раз
-// содержит пример одной из возможных его имплементаций.
-var (
-	// Взведенный флаг Debug указывает, что описания ошибок возвращаются как
-	// есть. В противном случае всегда возвращается только стандартное описание
-	// статуса HTTP, сформированное на базе этой ошибки.
-	Debug bool = false
-
-	// Флаг Compress разрешает сжатие данных. Чтобы запретить сжимать данные,
-	// установите значение данного флага в false. При инициализации сжатия
-	// проверяется, что оно уже не включено, например, на уровне глобального
-	// обработчика запросов и, в этом случае, сжатие не будет включено, даже
-	// если флаг установлен.
-	Compress bool = true
-
-	// Encoder описывает функции, используемые для разбора запроса и кодирования
-	// ответа. MaxBody задает максимальный размер поддерживаемого запроса.
-	// Если размер превышает указанный, то возвращается ошибка. Если не хочется
-	// ограничений, то можно установить значение 0, тогда проверка производиться
-	// не будет.
-	Encoder Coder = JSONCoder{1 << 15, true} // 32 мегабайта и отступы
-
-	// EncodeError управляет форматом вывода ошибок: если флаг не взведен, то
-	// ошибки отдаются как текст. В противном случае описание ошибок
-	// кодируются с помощью Encoder и содержат статус и описание ошибки.
-	EncodeError bool = true
+	"github.com/mdigger/router"
 )
 
 // Context содержит контекстную информацию HTTP-запроса и методы формирования
@@ -64,13 +28,13 @@ var (
 //
 // Однако и без некоторой ложки дегтя не обошлось: функция Context.Header()
 // скрывает доступ заголовкам запроса. Поэтому приходится явно прописывать,
-// что необходимо обращение именно к ним или использовать метод GetHeader().
+// что необходимо обращение именно к ним.
 type Context struct {
-	*http.Request        // HTTP запрос в разобранном виде
+	*http.Request        // HTTP запрос
 	ContentType   string // тип информации в ответе
 
 	response http.ResponseWriter // ответ на запрос
-	params   []param             // именованные параметры из пути запроса
+	params   router.Params       // именованные параметры из пути запроса
 	path     string              // путь запроса
 	status   int                 // код HTTP-ответа
 	sended   bool                // флаг отосланного ответа
@@ -117,7 +81,7 @@ func (c *Context) WriteHeader(code int) {
 // раз. Используется для поддержки интерфейса http.ResponseWriter.
 //
 // При первом вызове (может быть не явный) автоматически устанавливается статус
-// ответа. Если статус ответа был не задан, то будет использован статус 200
+// ответа. Если статус ответа не был задан, то будет использован статус 200
 // (ОК). Так же, если не был задан ContentType, то он будет определен
 // автоматически на основании анализа первых байт данных.
 func (c *Context) Write(data []byte) (int, error) {
@@ -144,12 +108,9 @@ func (c *Context) Write(data []byte) (int, error) {
 // Flush отдает накопленный буфер с ответом. Используется для поддержки
 // интерфейса http.Flusher.
 func (c *Context) Flush() {
-	type Flusher interface {
-		Flush() error
-	}
 	c.response.(http.Flusher).Flush()
-	if flusher, ok := c.writer.(Flusher); ok {
-		flusher.Flush()
+	if gzw, ok := c.writer.(*gzip.Writer); ok {
+		gzw.Flush()
 	}
 }
 
@@ -219,30 +180,11 @@ func (c *Context) SetData(key, value interface{}) {
 	c.Request = c.Request.WithContext(ctx)
 }
 
-// Эти ошибки обрабатываются при передаче их в метод Context.Send и
-// устанавливают соответствующий статус ответа.
-//
-// Кроме указанных здесь ошибок, так же проверяется, что ошибка отвечает на
-// os.IsNotExist (в этом случае статус станет 404) или os.IsPermission (статус
-// 403). Все остальные ошибки устанавливают статус 500.
-//
-// Если вам нет необходимости указывать собственное сообщение для вывода ошибки,
-// то проще всего воспользоваться этим предопределенными, использовав их в
-// context.Send():
-// 	return c.Send(ErrNotfound)
-var (
-	ErrDataAlreadySent       = errors.New("data already sent")
-	ErrBadRequest            = errors.New("bad request")              // 400
-	ErrUnauthorized          = errors.New("unauthorized")             // 401
-	ErrForbidden             = errors.New("forbidden")                // 403
-	ErrNotFound              = errors.New("not found")                // 404
-	ErrLengthRequired        = errors.New("length required")          // 411
-	ErrRequestEntityTooLarge = errors.New("request entity too large") // 413
-	ErrUnsupportedMediaType  = errors.New("unsupported media type")   // 415
-	ErrInternalServerError   = errors.New("internal server error")    // 500
-	ErrNotImplemented        = errors.New("not implemented")          // 501
-	ErrServiceUnavailable    = errors.New("service unavailable")      // 503
-)
+// Bind разбирает данные запроса и заполняет ими указанный в параметре объект.
+// Разбор осуществляется с помощью Encoder.
+func (c *Context) Bind(obj interface{}) error {
+	return Encoder.Bind(c, obj)
+}
 
 // Send отсылает переданные данные как ответ на запрос. В зависимости от типа
 // данных, используются разные форматы ответов. Поддерживаются данные в формате
@@ -296,38 +238,7 @@ func (c *Context) Send(data interface{}) (err error) {
 	// то отдаем ошибку
 	if err != nil && !c.sended {
 		// устанавливаем статус, в зависимости от ошибки
-		if c.status == 0 {
-			switch err {
-			case ErrBadRequest: // 400
-				c.status = http.StatusBadRequest
-			case ErrUnauthorized: // 401
-				c.status = http.StatusUnauthorized
-			case ErrForbidden: // 403
-				c.status = http.StatusForbidden
-			case ErrNotFound: // 404
-				c.status = http.StatusNotFound
-			case ErrLengthRequired: // 411
-				c.status = http.StatusLengthRequired
-			case ErrRequestEntityTooLarge: // 413
-				c.status = http.StatusRequestEntityTooLarge
-			case ErrUnsupportedMediaType: // 415
-				c.status = http.StatusUnsupportedMediaType
-			case ErrInternalServerError: // 500
-				c.status = http.StatusInternalServerError
-			case ErrNotImplemented: // 501
-				c.status = http.StatusNotImplemented
-			case ErrServiceUnavailable: // 503
-				c.status = http.StatusServiceUnavailable
-			default:
-				if os.IsNotExist(err) {
-					c.status = http.StatusNotFound
-				} else if os.IsPermission(err) {
-					c.status = http.StatusForbidden
-				} else {
-					c.status = http.StatusInternalServerError
-				}
-			}
-		}
+		c.setErrorStatus(err)
 		// В зависимости от флага Debug, отдаем либо текст ошибки, либо статуса
 		var msg string
 		if Debug {
@@ -343,13 +254,7 @@ func (c *Context) Send(data interface{}) (err error) {
 			_, err = fmt.Fprint(c, msg)
 		}
 	}
-	return
-}
-
-// Bind разбирает данные запроса и заполняет ими указанный в параметре объект.
-// Разбор осуществляется с помощью Encoder.
-func (c *Context) Bind(obj interface{}) error {
-	return Encoder.Bind(c, obj)
+	return err
 }
 
 // Error отправляет указанный текст как описание ошибки. В зависимости от
@@ -442,7 +347,6 @@ func (c *Context) close() {
 			gzips.Put(gzw)
 		}
 	}
-	c.log()         // выводим лог, если поддерживается
 	contexts.Put(c) // помещаем контекст обратно в пул
 }
 
@@ -450,5 +354,4 @@ func (c *Context) close() {
 var (
 	contexts = sync.Pool{New: func() interface{} { return new(Context) }}
 	gzips    = sync.Pool{New: func() interface{} { return new(gzip.Writer) }}
-	buffers  = sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}
 )

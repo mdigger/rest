@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mdigger/log"
 	"github.com/mdigger/router"
 )
 
@@ -35,14 +36,13 @@ type Context struct {
 
 	response http.ResponseWriter // ответ на запрос
 	params   router.Params       // именованные параметры из пути запроса
-	path     string              // путь запроса
 	status   int                 // код HTTP-ответа
 	sended   bool                // флаг отосланного ответа
 	query    url.Values          // параметры запроса в URL (кеш)
 	size     int                 // размер переданных данных
-	started  time.Time           // время начала обработки запроса
 	writer   io.Writer           // интерфейс для записи ответов
 	compress bool                // флаг, что мы включили сжатие
+	log      *log.TraceContext   // для вывода лога
 }
 
 // GetHeader позволяет получить доступ к заголовкам http,Request, которые
@@ -195,6 +195,7 @@ func (c *Context) Bind(obj interface{}) error {
 // отправлен, повторный вызов данного метода сразу возвращает ошибку.
 func (c *Context) Send(data interface{}) (err error) {
 	// не можем отправить ответ, если он уже отправлен
+	// вместо этого используйте метод Write
 	if c.sended {
 		return ErrDataAlreadySent
 	}
@@ -307,13 +308,16 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	c.Request = r
 	c.ContentType = ""
 	c.response = w
-	c.path = r.URL.Path
 	c.params = nil
 	c.status = 0
 	c.sended = false
 	c.query = nil
 	c.size = 0
-	c.started = time.Now()
+	ctxLog := Logger.WithFields(log.Fields{
+		"method": r.Method,
+		"remote": r.RemoteAddr,
+		"url":    r.URL,
+	})
 	// если сжатие еще не установлено, но поддерживается клиентом, то включаем его
 	if Compress && w.Header().Get("Content-Encoding") == "" &&
 		strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -323,17 +327,19 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		gzw.Reset(w)
 		c.writer = gzw
 		c.compress = true
+		ctxLog.AddField("gzip", true)
 	} else {
 		c.writer = w
 		c.compress = false
 	}
+	c.log = ctxLog.Tracef("%s %s", r.Method, r.URL.Path)
 	return c
 }
 
 // close возвращает контекст в пул используемых контекстов для дальнейшего
 // использования. Вызывается автоматически после того, как контекст перестает
 // использоваться.
-func (c *Context) close() {
+func (c *Context) close(err error) {
 	// если ответ не был послан, то шлем ошибку
 	if !c.sended {
 		c.Send(ErrInternalServerError)
@@ -347,6 +353,10 @@ func (c *Context) close() {
 			gzips.Put(gzw)
 		}
 	}
+	c.log.AddFields(log.Fields{
+		"size":   c.size,
+		"status": c.status,
+	}).Stop(&err)
 	contexts.Put(c) // помещаем контекст обратно в пул
 }
 

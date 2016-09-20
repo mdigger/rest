@@ -15,13 +15,14 @@ type Handler func(*Context) error
 // ServeHTTP поддерживает интерфейс http.Handler для Handler, что позволяет
 // использовать его с любыми совместимыми с http.Handler библиотеками.
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	context := newContext(w, r)        // инициализируем новый контекст запроса
-	if err := h(context); err != nil { // выполняем обработчик
+	context := newContext(w, r) // инициализируем новый контекст запроса
+	err := h(context)           // выполняем обработчик
+	if err != nil && !context.sended {
 		// пытаемся отослать ошибку, если еще ничего не отдавали
 		context.Send(err)
 	}
 	// освобождаем контекст запроса и помещаем его обратно в пул
-	context.close()
+	context.close(err)
 }
 
 // Handlers объединяет несколько обработчиков запросов в очередь. Они будут

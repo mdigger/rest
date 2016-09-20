@@ -25,23 +25,19 @@ type ServeMux struct {
 // отправлялся, то в этих случаях в ответ будет отправлена ошибка.
 func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := newContext(w, r) // формируем контекст для ответа
+	var err error         // ошибка обработки запроса
 	defer func() {
 		// перехватываем panic, если она случилась
 		if e := recover(); e != nil {
 			// если еще ничего не отсылали, то отсылаем эту ошибку
 			c.Send(e)
-			// // выводим дамп с ошибкой
-			// c.errorLog(e, 4) // записываем ошибку в лог
 		}
-		c.close() // освобождаем по окончании
+		c.close(err) // освобождаем по окончании
 	}()
-	// вызываем обработку запроса
-	if err := m.Handler(c); err != nil {
-		// c.errorLog(err, 1) // записываем ошибку в лог
+	err = m.Handler(c) // вызываем обработку запроса
+	if err != nil {
 		// если ничего не отправляли, то отправляем эту ошибку
-		if !c.sended {
-			c.Send(err) // возвращаемые ошибки игнорируем
-		}
+		c.Send(err) // возвращаемые ошибки игнорируем
 	}
 }
 
@@ -62,7 +58,7 @@ func (m *ServeMux) Handler(c *Context) error {
 	// получаем список обработчиков для данного метода
 	if routers := m.routers[c.Request.Method]; routers != nil {
 		// запрашиваем подходящий обработчик
-		if handler, params := routers.Lookup(c.path); handler != nil {
+		if handler, params := routers.Lookup(c.URL.Path); handler != nil {
 			// добавляем найденные параметры к контексту
 			c.params = append(c.params, params...)
 			// вызываем обработчик запроса
@@ -73,7 +69,7 @@ func (m *ServeMux) Handler(c *Context) error {
 	// собираем список методов, которые поддерживаются для данного пути
 	methods := make([]string, 0, len(m.routers))
 	for method, handlers := range m.routers {
-		if handler, _ := handlers.Lookup(c.path); handler != nil {
+		if handler, _ := handlers.Lookup(c.URL.Path); handler != nil {
 			methods = append(methods, method)
 		}
 	}
@@ -122,9 +118,9 @@ func (m *ServeMux) Handle(method, path string, handlers ...Handler) {
 // Handle создает новый ServeMux, добавляет в него обработчики для указанного
 // пути и метода, и возвращает его.
 func Handle(method, path string, handlers ...Handler) *ServeMux {
-	var mux ServeMux
+	var mux = new(ServeMux)
 	mux.Handle(method, path, handlers...)
-	return &mux
+	return mux
 }
 
 // Handles добавляет сразу список обработчиков для нескольких путей и методов.
@@ -148,9 +144,9 @@ func (m *ServeMux) Handles(paths Paths, handlers ...Handler) {
 // Handles возвращает новый инициализированный ServeMux c заданными
 // обработчиками HTTP-запросов.
 func Handles(paths Paths, handlers ...Handler) *ServeMux {
-	var mux ServeMux
+	var mux = new(ServeMux)
 	mux.Handles(paths, handlers...)
-	return &mux
+	return mux
 }
 
 type (

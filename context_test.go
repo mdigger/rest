@@ -27,7 +27,7 @@ func TestContext(t *testing.T) {
 	Compress = true
 	Debug = true
 	c := NewContext("/test?test=test#sdf", true)
-	defer c.close()
+	defer c.close(nil)
 	c.Request.Header.Set("Accept-Encoding", "gzip")
 
 	header := c.Header()
@@ -52,64 +52,64 @@ func TestContext(t *testing.T) {
 func TestContext2(t *testing.T) {
 	c := NewContext("/test", false)
 	c.WriteHeader(600)
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", false)
 	c.WriteHeader(0)
-	c.close()
+	c.close(nil)
 
 	Compress = false
 	c = NewContext("/test", false)
 	c.Write([]byte("<html><h1>test</h1></html>"))
 	c.Flush()
-	c.close()
+	c.close(nil)
 
 	Compress = true
 	c = NewContext("/test", true)
 	c.Write([]byte("plain text"))
 	c.Flush()
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send(nil)
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send([]byte("test"))
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send(errors.New("test"))
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send(strings.NewReader("test"))
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send("<html><h1>test</h1></html>")
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send("")
-	c.close()
+	c.close(nil)
 
 	Compress = false
 	c = NewContext("/test", true)
 	c.Send([]byte("<html><h1>test</h1></html>"))
 	c.Flush()
-	c.close()
+	c.close(nil)
 
 	Compress = true
 	c = NewContext("/test", true)
 	c.Send("<html><h1>test</h1></html>")
 	c.Flush()
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.Send(nil)
 	c.Flush()
-	c.close()
+	c.close(nil)
 
 	for _, err := range []error{
 		errors.New("text"),
@@ -138,29 +138,29 @@ func TestContext2(t *testing.T) {
 		Debug = (rand.Intn(10) < 5)
 		EncodeError = (rand.Intn(10) >= 5)
 		c.Send(err)
-		c.close()
+		c.close(nil)
 
 		c = NewContext("/test", true)
 		Debug = (rand.Intn(10) < 5)
 		EncodeError = (rand.Intn(10) >= 5)
 		c.Error(200+rand.Intn(301), err.Error())
-		c.close()
+		c.close(nil)
 	}
 
 	c = NewContext("/test", true)
 	c.GetHeader("Context-Type")
 	c.Redirect("/")
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.SetCookie(&http.Cookie{Name: "test", Value: "test"})
 	c.ServeFile("context_test.go")
-	c.close()
+	c.close(nil)
 
 	c = NewContext("/test", true)
 	c.ServeContent("test.txt", time.Now(), strings.NewReader("content"))
 	c.Send(errors.New("text"))
-	c.close()
+	c.close(nil)
 
 	// c = NewContext("/test", true)
 	// c.Send("text")
@@ -175,7 +175,7 @@ func TestContext2(t *testing.T) {
 	// c.close()
 
 	c = NewContext("/test", true)
-	c.close()
+	c.close(nil)
 }
 
 func TestBind(t *testing.T) {
@@ -186,20 +186,20 @@ func TestBind(t *testing.T) {
 	c := newContext(w, r)
 	obj := make(map[string]string)
 	err := c.Bind(&obj)
+	c.close(err)
 	if err != nil {
 		t.Error(err)
 	}
-	c.close()
 
 	r, _ = http.NewRequest("POST", "/test", strings.NewReader(jsontext))
 	w = httptest.NewRecorder()
 	c = newContext(w, r)
 	obj = make(map[string]string)
 	err = c.Bind(&obj)
+	c.close(err)
 	if err != ErrUnsupportedMediaType {
 		t.Error("Error:", err)
 	}
-	c.close()
 
 	r, _ = http.NewRequest("POST", "/test", strings.NewReader("{"+jsontext))
 	r.Header.Set("Content-Type", "application/json")
@@ -207,10 +207,10 @@ func TestBind(t *testing.T) {
 	c = newContext(w, r)
 	obj = make(map[string]string)
 	err = c.Bind(&obj)
+	c.close(err)
 	if err != ErrBadRequest {
 		t.Error("Error:", err)
 	}
-	c.close()
 
 	r, _ = http.NewRequest("POST", "/test", strings.NewReader(strings.Repeat("\"", 1<<16)))
 	r.Header.Set("Content-Type", "application/json")
@@ -218,10 +218,10 @@ func TestBind(t *testing.T) {
 	c = newContext(w, r)
 	obj = make(map[string]string)
 	err = c.Bind(&obj)
+	c.close(err)
 	if err != ErrRequestEntityTooLarge {
 		t.Error("Error:", err)
 	}
-	c.close()
 }
 
 func TestParams(t *testing.T) {
@@ -233,5 +233,5 @@ func TestParams(t *testing.T) {
 		t.Error("bad params")
 	}
 	c.Send(errors.New("text"))
-	c.close()
+	c.close(nil)
 }

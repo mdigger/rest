@@ -2,6 +2,9 @@ package rest
 
 import (
 	"net/http"
+	"os"
+	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"github.com/mdigger/router"
@@ -17,6 +20,8 @@ type ServeMux struct {
 	routers map[string]*router.Paths // обработчики запросов по методам
 }
 
+var stackFilter = regexp.MustCompile(`panic\(.*\)\n\t.*\n`)
+
 // ServeHTTP обеспечивает поддержку интерфейса http.Handler. Таким образом,
 // данный ServeMux можно использовать как стандартный обработчик HTTP-запросов.
 //
@@ -29,6 +34,18 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		// перехватываем panic, если она случилась
 		if e := recover(); e != nil {
+			if e, ok := e.(error); ok {
+				err = e
+			}
+			Logger.WithSource(4).WithError(err).Error("panic")
+			if Debug {
+				// выводим содержимое стека для отладки
+				stack := debug.Stack()
+				if indx := stackFilter.FindIndex(stack); indx != nil {
+					stack = stack[indx[1]:]
+				}
+				os.Stderr.Write(stack)
+			}
 			// если еще ничего не отсылали, то отсылаем эту ошибку
 			c.Send(e)
 		}

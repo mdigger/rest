@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -224,36 +223,15 @@ func (c *Context) Send(data interface{}) (err error) {
 		if c.ContentType == "" {
 			c.ContentType = "text/plain; charset=utf-8"
 		}
-		_, err = fmt.Fprint(c, data)
+		_, err = io.WriteString(c, data)
 	case error:
-		err = data // сводим задачу к обработке окончательной ошибки
-		break
+		err = c.sendError(data)
 	case []byte:
 		_, err = c.Write(data)
 	case io.Reader:
 		_, err = io.Copy(c, data)
 	default: // кодируем как объект
 		err = Encoder.Encode(c, data)
-	}
-	// если в процессе отправки произошла ошибка, но мы еще ничего не отправили,
-	// то отдаем ошибку
-	if err != nil && !c.sended {
-		// устанавливаем статус, в зависимости от ошибки
-		c.setErrorStatus(err)
-		// В зависимости от флага Debug, отдаем либо текст ошибки, либо статуса
-		var msg string
-		if Debug {
-			msg = err.Error()
-		} else {
-			msg = http.StatusText(c.status)
-		}
-		// В зависимости от флага, ошибку выводим как JSON или как текст
-		if EncodeError {
-			err = Encoder.Encode(c, JSON{"code": c.status, "error": msg})
-		} else {
-			c.ContentType = "text/plain; charset=utf-8"
-			_, err = fmt.Fprint(c, msg)
-		}
 	}
 	return err
 }
@@ -264,19 +242,12 @@ func (c *Context) Send(data interface{}) (err error) {
 // правило отладки и текст будет отдан в неизменном виде, в не зависимости от
 // установленного значения Debug.
 func (c *Context) Error(code int, msg string) error {
-	c.Status(code) // устанавливаем код ответа
-	if EncodeError {
-		return c.Send(JSON{"code": c.status, "error": msg})
-	}
-	c.ContentType = "text/plain; charset=utf-8"
-	return c.Send(msg)
+	return c.sendError(&HTTPError{code, msg})
 }
 
 // Redirect отсылает ответ с требованием временного перехода по указанному URL.
-// Ошибка никогда не возвращается.
 func (c *Context) Redirect(url string) error {
-	http.Redirect(c, c.Request, url, http.StatusFound)
-	return nil
+	return c.redirect(url, http.StatusFound)
 }
 
 // ServeContent просто вызывает http.ServeContent, передавая ему все

@@ -37,6 +37,7 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if e, ok := e.(error); ok {
 				err = e
 			}
+			// выводим информацию в лог
 			Logger.WithSource(4).WithError(err).Error("panic")
 			if Debug {
 				// выводим содержимое стека для отладки
@@ -46,15 +47,12 @@ func (m *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				os.Stderr.Write(stack)
 			}
-			// если еще ничего не отсылали, то отсылаем эту ошибку
-			c.Send(e)
 		}
 		c.close(err) // освобождаем по окончании
 	}()
 	err = m.Handler(c) // вызываем обработку запроса
 	if err != nil {
-		// если ничего не отправляли, то отправляем эту ошибку
-		c.Send(err) // возвращаемые ошибки игнорируем
+		c.sendError(err)
 	}
 }
 
@@ -74,14 +72,25 @@ func (m *ServeMux) Handler(c *Context) error {
 	}
 	// получаем список обработчиков для данного метода
 	if routers := m.routers[c.Request.Method]; routers != nil {
+		var path = c.URL.Path
 		// запрашиваем подходящий обработчик
-		if handler, params := routers.Lookup(c.URL.Path); handler != nil {
+		if handler, params := routers.Lookup(path); handler != nil {
 			// добавляем найденные параметры к контексту
 			c.params = append(c.params, params...)
 			// вызываем обработчик запроса
 			return handler.(Handler)(c)
 		}
+		// проверяем, что определен обработчик для пути без или с "/" в конце
+		if strings.HasSuffix(path, "/") {
+			path = strings.TrimSuffix(path, "/")
+		} else {
+			path += "/"
+		}
+		if handler, _ := routers.Lookup(path); handler != nil {
+			return c.redirect(path, http.StatusPermanentRedirect)
+		}
 	}
+
 	// обработчик для данного пути не найден
 	// собираем список методов, которые поддерживаются для данного пути
 	methods := make([]string, 0, len(m.routers))
@@ -94,10 +103,10 @@ func (m *ServeMux) Handler(c *Context) error {
 		// если есть обработчики для данного пути, но с другими методами,
 		// то отдаем этот список методов
 		header.Set("Allow", strings.Join(methods, ", "))
-		return c.Status(http.StatusMethodNotAllowed).Send(nil)
+		return ErrMethodNotAllowed
 	}
 	// обработчики пути не определены ни для одного метода
-	return c.Send(ErrNotFound)
+	return ErrNotFound
 }
 
 // Handle регистрирует обработчик для указанного метода и пути.

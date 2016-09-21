@@ -1,9 +1,14 @@
 package rest
 
 import (
-	"errors"
+	"fmt"
+	"html"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"strings"
 )
 
 // Эти ошибки обрабатываются при передаче их в метод Context.Send и
@@ -18,53 +23,104 @@ import (
 // context.Send():
 // 	return c.Send(ErrNotfound)
 var (
-	ErrDataAlreadySent       = errors.New("data already sent")
-	ErrBadRequest            = errors.New("bad request")              // 400
-	ErrUnauthorized          = errors.New("unauthorized")             // 401
-	ErrForbidden             = errors.New("forbidden")                // 403
-	ErrNotFound              = errors.New("not found")                // 404
-	ErrLengthRequired        = errors.New("length required")          // 411
-	ErrRequestEntityTooLarge = errors.New("request entity too large") // 413
-	ErrUnsupportedMediaType  = errors.New("unsupported media type")   // 415
-	ErrInternalServerError   = errors.New("internal server error")    // 500
-	ErrNotImplemented        = errors.New("not implemented")          // 501
-	ErrServiceUnavailable    = errors.New("service unavailable")      // 503
+	ErrDataAlreadySent       = &HTTPError{0, "data already sent"}
+	ErrBadRequest            = &HTTPError{400, "bad request"}
+	ErrUnauthorized          = &HTTPError{401, "unauthorized"}
+	ErrForbidden             = &HTTPError{403, "forbidden"}
+	ErrNotFound              = &HTTPError{404, "not found"}
+	ErrMethodNotAllowed      = &HTTPError{405, "method not allowed"}
+	ErrLengthRequired        = &HTTPError{411, "length required"}
+	ErrRequestEntityTooLarge = &HTTPError{413, "request entity too large"}
+	ErrUnsupportedMediaType  = &HTTPError{415, "unsupported media type"}
+	ErrInternalServerError   = &HTTPError{500, "internal server error"}
+	ErrNotImplemented        = &HTTPError{501, "not implemented"}
+	ErrServiceUnavailable    = &HTTPError{503, "service unavailable"}
 )
 
-// setErrorStatus устанавливает статус ответа в зависимости от ошибки и ее типа.
-func (c *Context) setErrorStatus(err error) {
-	if err == nil || c.sended || c.status != 0 {
-		return
-	}
-	// устанавливаем статус, в зависимости от ошибки
-	switch err {
-	case ErrBadRequest: // 400
-		c.status = http.StatusBadRequest
-	case ErrUnauthorized: // 401
-		c.status = http.StatusUnauthorized
-	case ErrForbidden: // 403
-		c.status = http.StatusForbidden
-	case ErrNotFound: // 404
-		c.status = http.StatusNotFound
-	case ErrLengthRequired: // 411
-		c.status = http.StatusLengthRequired
-	case ErrRequestEntityTooLarge: // 413
-		c.status = http.StatusRequestEntityTooLarge
-	case ErrUnsupportedMediaType: // 415
-		c.status = http.StatusUnsupportedMediaType
-	case ErrInternalServerError: // 500
-		c.status = http.StatusInternalServerError
-	case ErrNotImplemented: // 501
-		c.status = http.StatusNotImplemented
-	case ErrServiceUnavailable: // 503
-		c.status = http.StatusServiceUnavailable
-	default:
-		if os.IsNotExist(err) {
-			c.status = http.StatusNotFound
-		} else if os.IsPermission(err) {
-			c.status = http.StatusForbidden
+type HTTPError struct {
+	Code    int    `json:"code"`
+	Message string `json:"error"`
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("%d %s", e.Code, e.Message)
+}
+
+// sendError отправляет ответ с ошибкой пользователю.
+func (c *Context) sendError(err error) error {
+	// приводим формат ошибки к HTTPError
+	var httpError *HTTPError
+	if herr, ok := err.(*HTTPError); ok {
+		if herr.Code == 0 {
+			return nil
+		}
+		httpError = herr
+	} else {
+		httpError = new(HTTPError)
+		switch {
+		case os.IsPermission(err):
+			httpError.Code = 403
+		case os.IsNotExist(err):
+			httpError.Code = 404
+		default:
+			httpError.Code = 500
+		}
+		if Debug {
+			httpError.Message = err.Error()
 		} else {
-			c.status = http.StatusInternalServerError
+			httpError.Message = http.StatusText(httpError.Code)
 		}
 	}
+	// устанавливаем код ответа
+	c.Status(httpError.Code)
+	// выводим информацию об ошибке
+	if EncodeError {
+		return Encoder.Encode(c, httpError)
+	}
+	c.ContentType = "text/plain; charset=utf-8"
+	// это скажет IE, что нет необходимости автоматически определять
+	// Content-Type, а необходимо использовать уже отданный content-type.
+	c.Header().Set("X-Content-Type-Options", "nosniff")
+	_, err = io.WriteString(c, httpError.Message)
+	return err
+}
+
+func (c *Context) redirect(urlStr string, code int) error {
+	if u, err := url.Parse(urlStr); err == nil {
+		if u.Scheme == "" && u.Host == "" {
+			oldpath := c.Request.URL.Path
+			if oldpath == "" { // should not happen, but avoid a crash if it does
+				oldpath = "/"
+			}
+			// no leading http://server
+			if urlStr == "" || urlStr[0] != '/' {
+				// make relative path absolute
+				olddir, _ := path.Split(oldpath)
+				urlStr = olddir + urlStr
+			}
+			var query string
+			if i := strings.Index(urlStr, "?"); i != -1 {
+				urlStr, query = urlStr[:i], urlStr[i:]
+			}
+			// clean up but preserve trailing slash
+			trailing := strings.HasSuffix(urlStr, "/")
+			urlStr = path.Clean(urlStr)
+			if trailing && !strings.HasSuffix(urlStr, "/") {
+				urlStr += "/"
+			}
+			urlStr += query
+		}
+	}
+	c.Header().Set("Location", urlStr)
+	c.Status(code)
+	if EncodeError {
+		return Encoder.Encode(c, JSON{"code": code, "location": urlStr})
+	}
+	if c.Request.Method == http.MethodGet {
+		c.ContentType = "text/html; charset=utf-8"
+		_, err := fmt.Fprintf(c, "<a href=\"%s\">%s</a>\n",
+			html.EscapeString(urlStr), http.StatusText(code))
+		return err
+	}
+	return nil
 }

@@ -63,6 +63,7 @@ func (c *Context) Header() http.Header {
 // каких-либо данных другим способом, кроме Write, уже не поддерживается.
 // Используется для поддержки интерфейса http.ResponseWriter.
 func (c *Context) WriteHeader(code int) {
+	// log.WithField("code", code).Debug("WriteHeader")
 	if c.sended {
 		return
 	}
@@ -84,6 +85,7 @@ func (c *Context) WriteHeader(code int) {
 // (ОК). Так же, если не был задан ContentType, то он будет определен
 // автоматически на основании анализа первых байт данных.
 func (c *Context) Write(data []byte) (int, error) {
+	// log.WithField("length", len(data)).Debug("Write")
 	if !c.sended {
 		// выполняем только при первой отдаче данных
 		header := c.response.Header()
@@ -107,6 +109,7 @@ func (c *Context) Write(data []byte) (int, error) {
 // Flush отдает накопленный буфер с ответом. Используется для поддержки
 // интерфейса http.Flusher.
 func (c *Context) Flush() {
+	// log.Debug("Flush")
 	c.response.(http.Flusher).Flush()
 	if gzw, ok := c.writer.(*gzip.Writer); ok {
 		gzw.Flush()
@@ -193,6 +196,7 @@ func (c *Context) Bind(obj interface{}) error {
 // Данный метод можно использовать только один раз: после того, как ответ
 // отправлен, повторный вызов данного метода сразу возвращает ошибку.
 func (c *Context) Send(data interface{}) (err error) {
+	// log.WithField("data", data).Debug("Send")
 	// не можем отправить ответ, если он уже отправлен
 	// вместо этого используйте метод Write
 	if c.sended {

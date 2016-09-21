@@ -1,10 +1,6 @@
 package rest
 
-import (
-	"os"
-
-	"github.com/mdigger/log"
-)
+import "github.com/mdigger/log"
 
 // Глобальные переменные библиотеки, позволяющие переопределять особенности
 // ее поведения. Сюда вынесено все, что может быть использовано библиотекой
@@ -41,5 +37,5 @@ var (
 	EncodeError bool = true
 
 	// Logger отвечает за вывод лога обращений к HTTP серверу.
-	Logger = log.New(log.NewPlainHandler(os.Stderr, log.LstdFlags))
+	Logger = log.Default
 )

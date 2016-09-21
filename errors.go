@@ -114,7 +114,11 @@ func (c *Context) redirect(urlStr string, code int) error {
 	c.Header().Set("Location", urlStr)
 	c.Status(code)
 	if EncodeError {
-		return Encoder.Encode(c, JSON{"code": code, "location": urlStr})
+		return Encoder.Encode(c, JSON{
+			"code":     code,
+			"message":  http.StatusText(code),
+			"location": urlStr,
+		})
 	}
 	if c.Request.Method == http.MethodGet {
 		c.ContentType = "text/html; charset=utf-8"

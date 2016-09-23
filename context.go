@@ -302,7 +302,7 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		gzw.Reset(w)
 		c.writer = gzw
 		c.compress = true
-		ctxLog.AddField("gzip", true)
+		ctxLog = ctxLog.WithField("gzip", true)
 	} else {
 		c.writer = w
 		c.compress = false
@@ -328,7 +328,7 @@ func (c *Context) close(err error) {
 			gzips.Put(gzw)
 		}
 	}
-	c.log.AddFields(log.Fields{
+	c.log.WithFields(log.Fields{
 		"size":   c.size,
 		"status": c.status,
 	}).Stop(&err)

@@ -2,13 +2,9 @@ package rest
 
 import (
 	"fmt"
-	"html"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
-	"strings"
 )
 
 // Эти ошибки обрабатываются при передаче их в метод Context.Send и
@@ -83,48 +79,4 @@ func (c *Context) sendError(err error) error {
 	c.Header().Set("X-Content-Type-Options", "nosniff")
 	_, err = io.WriteString(c, httpError.Message)
 	return err
-}
-
-func (c *Context) redirect(urlStr string, code int) error {
-	if u, err := url.Parse(urlStr); err == nil {
-		if u.Scheme == "" && u.Host == "" {
-			oldpath := c.Request.URL.Path
-			if oldpath == "" { // should not happen, but avoid a crash if it does
-				oldpath = "/"
-			}
-			// no leading http://server
-			if urlStr == "" || urlStr[0] != '/' {
-				// make relative path absolute
-				olddir, _ := path.Split(oldpath)
-				urlStr = olddir + urlStr
-			}
-			var query string
-			if i := strings.Index(urlStr, "?"); i != -1 {
-				urlStr, query = urlStr[:i], urlStr[i:]
-			}
-			// clean up but preserve trailing slash
-			trailing := strings.HasSuffix(urlStr, "/")
-			urlStr = path.Clean(urlStr)
-			if trailing && !strings.HasSuffix(urlStr, "/") {
-				urlStr += "/"
-			}
-			urlStr += query
-		}
-	}
-	c.Header().Set("Location", urlStr)
-	c.Status(code)
-	if EncodeError {
-		return Encoder.Encode(c, JSON{
-			"code":     code,
-			"message":  http.StatusText(code),
-			"location": urlStr,
-		})
-	}
-	if c.Request.Method == http.MethodGet {
-		c.ContentType = "text/html; charset=utf-8"
-		_, err := fmt.Fprintf(c, "<a href=\"%s\">%s</a>\n",
-			html.EscapeString(urlStr), http.StatusText(code))
-		return err
-	}
-	return nil
 }

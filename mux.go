@@ -88,7 +88,7 @@ func (m *ServeMux) Handler(c *Context) error {
 		}
 		// если найден подходящий обработчик, то предлагаем на него перейти
 		if handler, _ := routers.Lookup(path); handler != nil {
-			return c.redirect(path, http.StatusPermanentRedirect)
+			return c.Redirect(path, http.StatusPermanentRedirect)
 		}
 	}
 	// обработчик для данного пути не найден

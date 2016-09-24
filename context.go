@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"fmt"
+	"html"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -250,8 +253,50 @@ func (c *Context) Error(code int, msg string) error {
 }
 
 // Redirect отсылает ответ с требованием временного перехода по указанному URL.
-func (c *Context) Redirect(url string) error {
-	return c.redirect(url, http.StatusFound)
+func (c *Context) Redirect(urlStr string, code int) error {
+	if u, err := url.Parse(urlStr); err == nil {
+		if u.Scheme == "" && u.Host == "" {
+			oldpath := c.Request.URL.Path
+			if oldpath == "" { // should not happen, but avoid a crash if it does
+				oldpath = "/"
+			}
+			// no leading http://server
+			if urlStr == "" || urlStr[0] != '/' {
+				// make relative path absolute
+				olddir, _ := path.Split(oldpath)
+				urlStr = olddir + urlStr
+			}
+			var query string
+			if i := strings.Index(urlStr, "?"); i != -1 {
+				urlStr, query = urlStr[:i], urlStr[i:]
+			}
+			// clean up but preserve trailing slash
+			trailing := strings.HasSuffix(urlStr, "/")
+			urlStr = path.Clean(urlStr)
+			if trailing && !strings.HasSuffix(urlStr, "/") {
+				urlStr += "/"
+			}
+			urlStr += query
+		}
+	}
+	c.Header().Set("Location", urlStr)
+	if code < 300 || code >= 400 {
+		code = http.StatusFound
+	}
+	c.Status(code)
+	if EncodeError {
+		return c.Send(JSON{
+			"code":     code,
+			"message":  http.StatusText(code),
+			"location": urlStr,
+		})
+	}
+	if c.Request.Method == http.MethodGet {
+		c.ContentType = "text/html; charset=utf-8"
+		return c.Send(fmt.Sprintf("<a href=\"%s\">%s</a>\n",
+			html.EscapeString(urlStr), http.StatusText(code)))
+	}
+	return nil
 }
 
 // ServeContent просто вызывает http.ServeContent, передавая ему все

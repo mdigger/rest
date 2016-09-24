@@ -149,7 +149,7 @@ func TestContext2(t *testing.T) {
 
 	c = NewContext("/test", true)
 	c.GetHeader("Context-Type")
-	c.Redirect("/")
+	c.Redirect("/", http.StatusMovedPermanently)
 	c.close(nil)
 
 	c = NewContext("/test", true)

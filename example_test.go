@@ -12,23 +12,25 @@ import (
 	rest "github.com/mdigger/rest"
 )
 
+var (
+	settings = rest.Default
+	w        = &Recorder{httptest.NewRecorder()}
+	r        = httptest.NewRequest("", "/test", nil)
+)
+
 type Recorder struct {
 	*httptest.ResponseRecorder
 }
 
-func (r *Recorder) Write(buf []byte) (int, error) {
-	rec := r.ResponseRecorder
-	n, err := rec.Write(buf)
-	result := rec.Result()
-	io.Copy(os.Stdout, result.Body)
+func (rec *Recorder) Write(buf []byte) (int, error) {
+	recorder := rec.ResponseRecorder
+	n, err := recorder.Write(buf)
+	// result := recorder.Result()
+	io.Copy(os.Stdout, recorder.Body)
+	w = &Recorder{httptest.NewRecorder()}
+	r = httptest.NewRequest("", "/test", nil)
 	return n, err
 }
-
-var (
-	w        = &Recorder{httptest.NewRecorder()}
-	r        = httptest.NewRequest("", "/test", nil)
-	settings = rest.Default
-)
 
 func ExampleWrite() {
 	rest.Write(w, r, http.StatusOK, rest.JSON{
@@ -143,12 +145,12 @@ func ExampleJSON() {
 	// Output:
 	// {
 	//     "code": 200,
-	//     "success": true,
 	//     "data": {
 	//         "bool": true,
 	//         "int": 10,
 	//         "string": "test"
-	//     }
+	//     },
+	//     "success": true
 	// }
 }
 
@@ -162,7 +164,7 @@ func ExampleJSONEncoder() {
 		"bool":   true,
 	})
 	// Output:
-	// {"code":200,"success":true,"data":{"bool":true,"int":10,"string":"test"}}
+	// {"code":200,"data":{"bool":true,"int":10,"string":"test"},"success":true}
 }
 
 func ExampleJSONBind() {

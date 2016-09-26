@@ -1,51 +1,55 @@
 package rest
 
 import (
-	"os"
-
-	"github.com/mdigger/log"
+	"context"
+	"net/http"
 )
 
-// Глобальные переменные библиотеки, позволяющие переопределять особенности
-// ее поведения. Сюда вынесено все, что может быть использовано библиотекой
-// глобально, а не в контексте одного запроса, и что может потребовать
-// переопределения пользователем.
-//
-// В частности, если появится необходимость использования вместо формата JSON,
-// например, MsgPacл, то это можно достаточно легко осуществить, просто заменим
-// Encoder соответствующим обработчиком. Кстати, подпроект codex как раз
-// содержит пример одной из возможных его имплементаций.
-var (
-	// Взведенный флаг Debug указывает, что описания ошибок возвращаются как
-	// есть. В противном случае всегда возвращается только стандартное описание
-	// статуса HTTP, сформированное на базе этой ошибки.
-	Debug bool = false
-
-	// Флаг Compress разрешает сжатие данных. Чтобы запретить сжимать данные,
-	// установите значение данного флага в false. При инициализации сжатия
-	// проверяется, что оно уже не включено, например, на уровне глобального
-	// обработчика запросов и, в этом случае, сжатие не будет включено, даже
-	// если флаг установлен.
-	Compress bool = true
-
-	// Encoder описывает функции, используемые для разбора запроса и кодирования
-	// ответа. MaxBody задает максимальный размер поддерживаемого запроса.
-	// Если размер превышает указанный, то возвращается ошибка. Если не хочется
-	// ограничений, то можно установить значение 0, тогда проверка производиться
-	// не будет.
-	Encoder Coder = JSONCoder{1 << 15, true} // 32 мегабайта и отступы
-
-	// EncodeError управляет форматом вывода ошибок: если флаг не взведен, то
-	// ошибки отдаются как текст. В противном случае описание ошибок
-	// кодируется с помощью Encoder и содержат статус и описание ошибки.
-	EncodeError bool = true
-
-	// Logger отвечает за вывод лога обращений к HTTP серверу.
-	Logger *log.Context
-)
-
-func init() {
-	console := log.NewConsole(os.Stdout, log.LstdFlags|log.Lindent)
-	console.SetLevel(log.DebugLevel)
-	Logger = console.Context()
+// Default contains the default Settings.
+var Default = &Settings{
+	Headers:      map[string]string{"X-API-Version": "1.0"},
+	Preprocessor: Preprocessor,
+	Encoder:      JSONEncoder(true),
 }
+
+// Settings describes the possible settings of the response processing.
+type Settings struct {
+	// Headers can contain a list of additional headers that will be
+	// automatically added to the response.
+	Headers map[string]string
+
+	// Preprocessor allows you to change the data and status before they will be
+	// given in response.
+	Preprocessor func(w http.ResponseWriter, r *http.Request,
+		status int, data interface{}) (newStatus int, newData interface{})
+
+	// Encoder includes an Encoder, which is used to return data.
+	Encoder Encoder
+
+	// OnError is called in case of error, returns data.
+	OnError func(err error)
+
+	// OnComplete is called after the return data. The status and data as well
+	// adds the processing time of the query.
+	OnComplete func(w http.ResponseWriter, r *http.Request,
+		status int, data interface{})
+
+	// AllowMultiple indicates that multiple responses are allowed. Otherwise,
+	// multiple calls to With will panic.
+	AllowMultiple bool
+}
+
+// Handler attach Settings to the context of the request and handle it.
+func (s *Settings) Handler(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// add settings to request context
+		ctx := context.WithValue(r.Context(), keySettings, s)
+		h.ServeHTTP(w, r.WithContext(ctx)) // serve handler
+	})
+}
+
+type contextKey byte // context key type
+const (
+	keySettings contextKey = iota
+	keyResponded
+)

@@ -1,22 +1,4 @@
-# REST API
-[![GoDoc](https://godoc.org/github.com/mdigger/rest?status.svg)](https://godoc.org/github.com/mdigger/rest)
-[![Build Status](https://travis-ci.org/mdigger/rest.svg)](https://travis-ci.org/mdigger/rest)
-[![Coverage Status](https://coveralls.io/repos/mdigger/rest/badge.svg?branch=master&service=github)](https://coveralls.io/github/mdigger/rest?branch=master)
-
-Package rest is designed for creating RESTful APIs.
-
-- makes it easy to give any objects that support serialization to JSON
-- if desired, the output format can be overridden at any other
-- supports the restriction of only one response to the request
-- can be used with the standard http library
-- have the ability to override the data format before output
-- it is possible to set your headers to output
-- separate support for handling redirects
-- ready for logging responses
-
-## Example
-```go
-package main
+package rest_test
 
 import (
 	"log"
@@ -63,7 +45,7 @@ func fooHandler(w http.ResponseWriter, r *http.Request) {
 	rest.Write(w, r, http.StatusOK, data)
 }
 
-func main() {
+func Example() {
 	opts := &rest.Settings{
 		Headers:      map[string]string{"X-API-Version": "2.1"},
 		Preprocessor: preprocessor,
@@ -76,4 +58,3 @@ func main() {
 	http.Handle("/foo", opts.Handler(http.HandlerFunc(fooHandler)))
 	http.ListenAndServe("http", nil)
 }
-```

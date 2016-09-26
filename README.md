@@ -70,7 +70,7 @@ func main() {
 		OnError:      func(err error) { log.Println("Error:", err) },
 		OnComplete: func(w http.ResponseWriter, r *http.Request,
 			status int, data interface{}) {
-			log.Printf("<- [%03d] %@v", status, data)
+			log.Printf("<- [%03d] %#v", status, data)
 		},
 	}
 	http.Handle("/foo", opts.Handler(http.HandlerFunc(fooHandler)))

@@ -7,6 +7,12 @@ import (
 
 // Write gives the data with the specified status. Use either the default
 // settings or out of context if they were used.
+//
+// Note: errors are a first class concern in Go, with most methods optionally
+// returning one as the second argument — but if you try to encode an error
+// object into JSON, you will receive an empty response. This is because error
+// is an interface type, and there are no exported fields. The easiest way to
+// override the error in function of preprocessing.
 func Write(w http.ResponseWriter, r *http.Request, status int, data interface{}) {
 	var settings *Settings
 	// get settings from request context

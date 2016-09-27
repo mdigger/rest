@@ -73,7 +73,7 @@ func ExampleSettings_Handler() {
 		})))
 }
 
-func ExampleStandard() {
+func ExampleSettings_standard() {
 	rest.Standard.Headers["X-My-Header"] = "My header"
 	rest.Standard.OnError = func(err error) { log.Println("Error:", err) }
 	rest.Standard.OnComplete = func(w http.ResponseWriter, r *http.Request,
@@ -84,6 +84,27 @@ func ExampleStandard() {
 		func(w http.ResponseWriter, r *http.Request) {
 			rest.Write(w, r, http.StatusOK, rest.JSON{"date": time.Now()})
 		})))
+}
+
+func ExampleSettings_default() {
+	rest.Default = rest.Standard
+
+	rest.Write(w, r, http.StatusOK, rest.JSON{
+		"string": "test",
+		"int":    10,
+		"bool":   true,
+	})
+	// Output:
+	// {
+	//     "code": 200,
+	//     "status": "OK",
+	//     "success": true,
+	//     "data": {
+	//         "bool": true,
+	//         "int": 10,
+	//         "string": "test"
+	//     }
+	// }
 }
 
 func ExamplePreprocessor() {

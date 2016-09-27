@@ -5,6 +5,11 @@ import (
 	"net/http"
 )
 
+// Predefined Settings.
+//
+// The easiest way to use the Standard settings, to override them as the Default
+// settings.
+// 	rest.Default = rest.Standard
 var (
 	// Default contains the default Settings.
 	Default = new(Settings)

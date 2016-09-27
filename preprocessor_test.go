@@ -53,7 +53,7 @@ func TestPreprocessor(t *testing.T) {
 		t.Errorf("bad status:", data.Status)
 	}
 
-	_, obj = Preprocessor(w, r, 301, RedirectURL("/new"))
+	_, obj = Preprocessor(w, r, 301, &RedirectURL{"/new"})
 	data, ok = obj.(*Response)
 	if !ok {
 		t.Fatal("bad response type")
@@ -61,7 +61,7 @@ func TestPreprocessor(t *testing.T) {
 	if data.Code != 301 {
 		t.Errorf("bad status: %v", data.Code)
 	}
-	if data.Data != nil {
+	if data.Data.(*RedirectURL).Redirect != "/new" {
 		t.Errorf("bad data:", data.Data)
 	}
 	if data.Error != "" {
@@ -69,8 +69,5 @@ func TestPreprocessor(t *testing.T) {
 	}
 	if data.Status != http.StatusText(301) {
 		t.Errorf("bad status:", data.Status)
-	}
-	if string(data.Redirect) != "/new" {
-		t.Errorf("bad redirect:", data.Redirect)
 	}
 }

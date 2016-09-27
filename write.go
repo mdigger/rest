@@ -65,5 +65,3 @@ func Write(w http.ResponseWriter, r *http.Request, status int, data interface{})
 		*r = *nr
 	}
 }
-
-var settingsNone = new(Settings)

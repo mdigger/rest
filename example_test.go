@@ -44,9 +44,8 @@ func ExampleWrite() {
 }
 
 func ExampleRedirect() {
-	rest.Default.Preprocessor = rest.Preprocessor
 	rest.Redirect(w, r, http.StatusFound, fmt.Sprintf("/obj/%d", 468))
-	// Output: {"code":302,"success":true,"status":"Found","redirect":"/obj/468"}
+	// Output: {"redirect":"/obj/468"}
 }
 
 func ExampleSettings() {

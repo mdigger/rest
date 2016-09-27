@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	rest "github.com/mdigger/rest"
+	"github.com/mdigger/rest"
 )
 
 var (

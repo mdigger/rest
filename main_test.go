@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	rest "github.com/mdigger/rest"
+	"github.com/mdigger/rest"
 )
 
 func preprocessor(w http.ResponseWriter, r *http.Request,

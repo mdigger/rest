@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	settings = rest.Default
+	settings = rest.Standard
 	w        = &Recorder{httptest.NewRecorder()}
 	r        = httptest.NewRequest("", "/test", nil)
 )
@@ -29,6 +29,8 @@ func (rec *Recorder) Write(buf []byte) (int, error) {
 	io.Copy(os.Stdout, recorder.Body)
 	w = &Recorder{httptest.NewRecorder()}
 	r = httptest.NewRequest("", "/test", nil)
+	// restore default settings
+	rest.Default = new(rest.Settings)
 	return n, err
 }
 
@@ -38,27 +40,13 @@ func ExampleWrite() {
 		"int":    10,
 		"bool":   true,
 	})
-	// Output:
-	// {
-	//     "code": 200,
-	//     "success": true,
-	//     "data": {
-	//         "bool": true,
-	//         "int": 10,
-	//         "string": "test"
-	//     }
-	// }
+	// Output: {"bool":true,"int":10,"string":"test"}
 }
 
 func ExampleRedirect() {
+	rest.Default.Preprocessor = rest.Preprocessor
 	rest.Redirect(w, r, http.StatusFound, fmt.Sprintf("/obj/%d", 468))
-	// Output:
-	// {
-	//     "code": 302,
-	//     "success": true,
-	//     "status": "Found",
-	//     "redirect": "/obj/468"
-	// }
+	// Output: {"code":302,"success":true,"status":"Found","redirect":"/obj/468"}
 }
 
 func ExampleSettings() {
@@ -80,23 +68,23 @@ func ExampleSettings() {
 }
 
 func ExampleSettings_Handler() {
-	http.Handle("/rest", settings.Handler(http.HandlerFunc(
+	http.Handle("/rest", rest.Standard.Handler(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			rest.Write(w, r, http.StatusOK, rest.JSON{"date": time.Now()})
 		})))
 }
 
-func ExampleDefault() {
-	rest.Default.Headers["X-My-Header"] = "My header"
-	rest.Default.OnError = func(err error) { log.Println("Error:", err) }
-	rest.Default.OnComplete = func(w http.ResponseWriter, r *http.Request,
+func ExampleStandard() {
+	rest.Standard.Headers["X-My-Header"] = "My header"
+	rest.Standard.OnError = func(err error) { log.Println("Error:", err) }
+	rest.Standard.OnComplete = func(w http.ResponseWriter, r *http.Request,
 		status int, data interface{}) {
 		log.Printf("<- [%03d] %#v", status, data)
 	}
-	http.Handle("/rest", http.HandlerFunc(
+	http.Handle("/rest", rest.Standard.Handler(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			rest.Write(w, r, http.StatusOK, rest.JSON{"date": time.Now()})
-		}))
+		})))
 }
 
 func ExamplePreprocessor() {
@@ -124,15 +112,7 @@ func ExamplePreprocessor() {
 	// }
 
 	// Output:
-	// {
-	//     "code": 200,
-	//     "data": {
-	//         "bool": true,
-	//         "int": 10,
-	//         "string": "test"
-	//     },
-	//     "success": true
-	// }
+	// {"code":200,"data":{"bool":true,"int":10,"string":"test"},"success":true}
 }
 
 func ExampleJSON() {
@@ -142,21 +122,12 @@ func ExampleJSON() {
 		"bool":   true,
 	})
 
-	// Output:
-	// {
-	//     "code": 200,
-	//     "data": {
-	//         "bool": true,
-	//         "int": 10,
-	//         "string": "test"
-	//     },
-	//     "success": true
-	// }
+	// Output: {"bool":true,"int":10,"string":"test"}
 }
 
 func ExampleJSONEncoder() {
-	// no indent JSON
-	rest.Default.Encoder = rest.JSONEncoder(false)
+	// indent JSON
+	rest.Default.Encoder = rest.JSONEncoder(true)
 
 	rest.Write(w, r, http.StatusOK, rest.JSON{
 		"string": "test",
@@ -164,7 +135,11 @@ func ExampleJSONEncoder() {
 		"bool":   true,
 	})
 	// Output:
-	// {"code":200,"data":{"bool":true,"int":10,"string":"test"},"success":true}
+	// {
+	//     "bool": true,
+	//     "int": 10,
+	//     "string": "test"
+	// }
 }
 
 func ExampleJSONBind() {

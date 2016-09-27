@@ -10,6 +10,7 @@ import (
 
 func TestSettings(t *testing.T) {
 	settings := &Settings{
+		Headers: map[string]string{"X-API-Version": "1.0"},
 		OnComplete: func(w http.ResponseWriter, r *http.Request, status int, data interface{}) {
 			// log.Printf("<- [%03d] %#v", status, data)
 			if status != 200 || data == nil {

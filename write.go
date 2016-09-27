@@ -19,7 +19,7 @@ func Write(w http.ResponseWriter, r *http.Request, status int, data interface{})
 	if contextSettings, ok := r.Context().Value(keySettings).(*Settings); ok {
 		settings = contextSettings
 	} else {
-		settings = Default // default settings
+		settings = Default // default - none settings
 	}
 	// check double response
 	if !settings.AllowMultiple && r.Context().Value(keyResponded) != nil {
@@ -41,7 +41,7 @@ func Write(w http.ResponseWriter, r *http.Request, status int, data interface{})
 	if settings.Encoder != nil {
 		encoder = settings.Encoder
 	} else {
-		encoder = JSONEncoder(true) // JSON by default
+		encoder = JSONEncoder(false) // JSON by default
 	}
 	// set response headers
 	responseHeader.Set("Content-Type", encoder.ContentType(w, r))
@@ -65,3 +65,5 @@ func Write(w http.ResponseWriter, r *http.Request, status int, data interface{})
 		*r = *nr
 	}
 }
+
+var settingsNone = new(Settings)

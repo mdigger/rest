@@ -5,12 +5,16 @@ import (
 	"net/http"
 )
 
-// Default contains the default Settings.
-var Default = &Settings{
-	Headers:      map[string]string{"X-API-Version": "1.0"},
-	Preprocessor: Preprocessor,
-	Encoder:      JSONEncoder(true),
-}
+var (
+	// Default contains the default Settings.
+	Default = new(Settings)
+	// Standard contains the predefined standard Settings.
+	Standard = &Settings{
+		Headers:      map[string]string{"X-API-Version": "1.0"},
+		Preprocessor: Preprocessor,
+		Encoder:      JSONEncoder(true),
+	}
+)
 
 // Settings describes the possible settings of the response processing.
 type Settings struct {

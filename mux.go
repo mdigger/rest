@@ -5,8 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
-	"runtime"
 	"strings"
 	"time"
 
@@ -33,7 +31,6 @@ type ServeMux struct {
 	Headers     map[string]string // additional http headers
 	*Options                      // write options
 	NotCompress bool              // disallow compression of the response
-	Debug       bool              // write errors to output
 	Logger      *log.Context      // logger
 	routers     map[string]*router.Paths
 }
@@ -73,16 +70,22 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		ctxlog = mux.Logger
 		defer func() {
-			msg := fmt.Sprintf("%s %s", r.Method, r.RequestURI)
 			ctxlog = ctxlog.WithFields(log.Fields{
 				"code":     code,
 				"duration": time.Since(started),
 			})
-			if err != nil {
+			msg := fmt.Sprintf("%s %s", r.Method, r.RequestURI)
+			switch {
+			case err != nil:
 				ctxlog.WithError(err).Error(msg)
-			} else {
+			case code < 400:
 				ctxlog.Info(msg)
+			case code < 500:
+				ctxlog.Warning(msg)
+			default:
+				ctxlog.Error(msg)
 			}
+
 		}()
 	}
 
@@ -125,19 +128,18 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// execute handler
 			fnHandler := handler.(Handler)
 			code, err = fnHandler(w, r)
-			if code >= 400 {
-				if mux.Debug {
-					Write(w, r, code, err) // output error
-				} else {
-					Write(w, r, code, nil) // no output error
-				}
+			if code == 0 {
+				code = http.StatusOK
+				Write(w, r, code, nil)
+			} else if code >= 400 {
+				Write(w, r, code, nil)
 			}
-			if err != nil && mux.Debug && ctxlog != nil {
-				// add handler name to log
-				name := runtime.FuncForPC(
-					reflect.ValueOf(fnHandler).Pointer()).Name()
-				ctxlog = ctxlog.WithField("handler", name)
-			}
+			// if err != nil && mux.Debug && ctxlog != nil {
+			// 	// add handler name to log
+			// 	name := runtime.FuncForPC(
+			// 		reflect.ValueOf(fnHandler).Pointer()).Name()
+			// 	ctxlog = ctxlog.WithField("handler", name)
+			// }
 			return
 		}
 		// try add slash at the end

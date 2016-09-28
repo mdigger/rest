@@ -30,7 +30,6 @@ func Example() {
 			DataAdapter:   rest.Adapter,
 			AllowMultiple: false,
 		},
-		Debug:  true,
 		Logger: log.Default,
 	}
 	mux.Handle("GET", "/user/:name", getUser)

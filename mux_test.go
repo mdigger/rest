@@ -27,7 +27,6 @@ func TestServeMux(t *testing.T) {
 			DataAdapter:   Adapter,
 			AllowMultiple: false,
 		},
-		Debug:  true,
 		Logger: log.Default,
 	}
 	// Handle("", "", nil)
@@ -76,7 +75,6 @@ func TestServeMuxHandlePanic(t *testing.T) {
 		}
 	}()
 	mux := new(ServeMux)
-	mux.Debug = true
 	mux.Logger = log.Default
 	mux.Handle("", "/:name", nil)
 }
@@ -91,7 +89,6 @@ func TestServeMuxError(t *testing.T) {
 	}()
 	path := strings.Repeat("/test", 50000)
 	mux := new(ServeMux)
-	mux.Debug = true
 	mux.Logger = log.Default
 	mux.Handle("GET", path, func(w http.ResponseWriter, r *http.Request) (int, error) {
 		return Write(w, r, 200, "OK")
@@ -100,7 +97,6 @@ func TestServeMuxError(t *testing.T) {
 
 func TestError(t *testing.T) {
 	mux := new(ServeMux)
-	mux.Debug = true
 	mux.Logger = log.Default
 	mux.Handle("GET", "/test", func(w http.ResponseWriter, r *http.Request) (int, error) {
 		return 500, errors.New("test error")
@@ -108,9 +104,4 @@ func TestError(t *testing.T) {
 	r := httptest.NewRequest("", "/test", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, r)
-
-	mux.Debug = false
-	r = httptest.NewRequest("", "/test", nil)
-	mux.ServeHTTP(w, r)
-
 }

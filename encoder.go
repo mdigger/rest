@@ -5,9 +5,6 @@ import (
 	"net/http"
 )
 
-// JSON is just a quick way to describe data structures.
-type JSON map[string]interface{}
-
 // Encoder describes an object capable of encoding a response.
 type Encoder interface {
 	// ContentType returns a string with the Content-Type to return in response
@@ -38,3 +35,5 @@ func (indent JSONEncoder) Encode(w http.ResponseWriter, r *http.Request,
 	}
 	return enc.Encode(v)
 }
+
+var defaultEncoder Encoder = JSONEncoder(false)

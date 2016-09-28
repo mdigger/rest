@@ -10,22 +10,22 @@ func TestRedirect(t *testing.T) {
 	r := httptest.NewRequest("", "/test", nil)
 	Redirect(w, r, 302, "/new/?test")
 	resp := w.Result()
-	if status := resp.StatusCode; status != 302 {
-		t.Errorf("bad status code: %v", status)
+	if code := resp.StatusCode; code != 302 {
+		t.Errorf("bad status code: %v", code)
 	}
 	if location := resp.Header.Get("Location"); location != "/new/?test" {
 		t.Errorf("bad location: %v", location)
 	}
 }
 
-func TestRedirect2(t *testing.T) {
+func TestRedirectEmpty(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("", "/test", nil)
 	r.URL.Path = ""
 	Redirect(w, r, 302, "")
 	resp := w.Result()
-	if status := resp.StatusCode; status != 302 {
-		t.Errorf("bad status code: %v", status)
+	if code := resp.StatusCode; code != 302 {
+		t.Errorf("bad status code: %v", code)
 	}
 	if location := resp.Header.Get("Location"); location != "/" {
 		t.Errorf("bad location: %v", location)

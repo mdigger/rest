@@ -5,75 +5,53 @@
 
 Package rest is designed for creating RESTful APIs.
 
-- makes it easy to give any objects that support serialization to JSON
-- if desired, the output format can be overridden at any other
 - supports the restriction of only one response to the request
-- can be used with the standard http library
 - have the ability to override the data format before output
 - it is possible to set your headers to output
 - separate support for handling redirects
 - ready for logging responses
+- support for named parameters in the path
 
 ## Example
 ```go
 package main
 
 import (
-	"log"
 	"net/http"
-	"time"
 
+	"github.com/mdigger/log"
 	"github.com/mdigger/rest"
 )
 
-func preprocessor(w http.ResponseWriter, r *http.Request,
-	status int, data interface{}) (int, interface{}) {
-
-	dataEnvelope := rest.JSON{"code": status}
-	if err, ok := data.(error); ok {
-		dataEnvelope["error"] = err.Error()
-		dataEnvelope["success"] = false
-	} else {
-		dataEnvelope["data"] = data
-		dataEnvelope["success"] = true
-	}
-	return status, dataEnvelope
+func getUser(w http.ResponseWriter, r *http.Request) (int, error) {
+	name := rest.Params(r).Get("name")
+	data := rest.JSON{"name": name}
+	return rest.Write(w, r, http.StatusOK, data)
 }
 
-func fooHandler(w http.ResponseWriter, r *http.Request) {
-	if time.Now().Weekday() == time.Monday {
-		rest.Redirect(w, r, http.StatusFound, "http://golang.org/")
-		return
-	}
-
-	if r.Method == http.MethodPost {
-		var obj = make(rest.JSON)
-		err := rest.JSONBind(r, &obj)
-		if err != nil {
-			rest.Write(w, r, http.StatusBadRequest, err)
-			return
-		}
-	}
-
-	data := rest.JSON{
-		"string": "test",
-		"int":    10,
-		"bool":   true,
-	}
-	rest.Write(w, r, http.StatusOK, data)
+func getFile(w http.ResponseWriter, r *http.Request) (int, error) {
+	name := rest.Params(r).Get("filename")
+	http.ServeFile(w, r, name)
+	return http.StatusOK, nil
 }
 
 func main() {
-	opts := &rest.Settings{
-		Headers:      map[string]string{"X-API-Version": "2.1"},
-		Preprocessor: preprocessor,
-		OnError:      func(err error) { log.Println("Error:", err) },
-		OnComplete: func(w http.ResponseWriter, r *http.Request,
-			status int, data interface{}) {
-			log.Printf("<- [%03d] %#v", status, data)
+	mux := &rest.ServeMux{
+		Headers: map[string]string{
+			"X-API-Version": "1.0",
 		},
+		NotCompress: false,
+		Options: &rest.Options{
+			Encoder:       rest.JSONEncoder(true),
+			DataAdapter:   rest.Adapter,
+			AllowMultiple: false,
+		},
+		Debug:  true,
+		Logger: log.Default,
 	}
-	http.Handle("/foo", opts.Handler(http.HandlerFunc(fooHandler)))
-	http.ListenAndServe("http", nil)
+	mux.Handle("GET", "/user/:name", getUser)
+	mux.Handle("GET", "/files/*filename", getFile)
+
+	http.ListenAndServe(":8080", mux)
 }
 ```

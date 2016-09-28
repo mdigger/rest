@@ -48,11 +48,8 @@ func TestWriteEncodeError(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("", "/test", nil)
 
-	defer func() {
-		p := recover()
-		if err, ok := p.(error); !ok || err.Error() != "json: unsupported type: complex128" {
-			t.Error("bad encoder error check")
-		}
-	}()
-	Write(w, r, 200, complex(1, 76))
+	_, err := Write(w, r, 200, complex(1, 76))
+	if err == nil {
+		t.Error("bad encoder error check")
+	}
 }

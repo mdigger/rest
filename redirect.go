@@ -7,14 +7,16 @@ import (
 	"strings"
 )
 
-// RedirectURL describes the type of the string containing the URL to redirect.
+// RedirectURL describes the URL to redirect.
 type RedirectURL struct {
 	Redirect string `json:"redirect"`
 }
 
 // Redirect causes the URL to absolute relative to the current request and
 // invokes Write with RedirectURL(urlStr).
-func Redirect(w http.ResponseWriter, r *http.Request, status int, urlStr string) {
+func Redirect(w http.ResponseWriter, r *http.Request,
+	status int, urlStr string) (int, error) {
+	// trying to set relative path
 	if u, err := url.Parse(urlStr); err == nil {
 		if u.Scheme == "" && u.Host == "" {
 			oldpath := r.URL.Path
@@ -41,5 +43,5 @@ func Redirect(w http.ResponseWriter, r *http.Request, status int, urlStr string)
 		}
 	}
 	w.Header().Set("Location", urlStr)
-	Write(w, r, status, &RedirectURL{urlStr})
+	return Write(w, r, status, &RedirectURL{urlStr})
 }

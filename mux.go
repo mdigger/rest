@@ -36,10 +36,7 @@ type ServeMux struct {
 }
 
 // Handle registers the handler for the given method and pattern.
-func (mux *ServeMux) Handle(method, pattern string, handler Handler) {
-	if handler == nil {
-		panic("rest: nil handler")
-	}
+func (mux *ServeMux) Handle(method, pattern string, handlers ...Handler) {
 	if method == "" {
 		method = "GET"
 	}
@@ -53,7 +50,7 @@ func (mux *ServeMux) Handle(method, pattern string, handler Handler) {
 		r = new(router.Paths)
 		mux.routers[method] = r
 	}
-	if err := r.Add(pattern, handler); err != nil {
+	if err := r.Add(pattern, Handlers(handlers...)); err != nil {
 		panic(err) // the handler does not suit us for some reason
 	}
 }

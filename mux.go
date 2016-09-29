@@ -139,16 +139,18 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// }
 			return
 		}
-		// try add slash at the end
-		if !strings.HasSuffix(urlPath, "/") {
+		// try add/remove slash at the end
+		if strings.HasSuffix(urlPath, "/") {
+			urlPath = strings.TrimSuffix(urlPath, "/")
+		} else {
 			urlPath += "/"
-			if handler, _ := routers.Lookup(urlPath); handler != nil {
-				code, err = Redirect(w, r, http.StatusMovedPermanently, urlPath)
-				if ctxlog != nil {
-					ctxlog = ctxlog.WithField("url", urlPath)
-				}
-				return
+		}
+		if handler, _ := routers.Lookup(urlPath); handler != nil {
+			code, err = Redirect(w, r, http.StatusMovedPermanently, urlPath)
+			if ctxlog != nil {
+				ctxlog = ctxlog.WithField("url", urlPath)
 			}
+			return
 		}
 	}
 

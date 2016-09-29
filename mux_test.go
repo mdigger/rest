@@ -38,9 +38,9 @@ func TestServeMux(t *testing.T) {
 		method, url string
 		status      int
 	}{
-		{"GET", "/test/", 404},
+		{"GET", "/test/", 301},
 		{"GET", "/test/test", 301},
-		{"POST", "/test/", 404},
+		{"POST", "/test/", 301},
 		{"TEST", "/test/", 404},
 		{"GET", "/test", 200},
 		{"POST", "/test", 200},
@@ -65,18 +65,6 @@ func TestServeMux(t *testing.T) {
 		}
 		fmt.Println(strings.Repeat("-", 60))
 	}
-}
-
-func TestServeMuxHandlePanic(t *testing.T) {
-	defer func() {
-		p := recover()
-		if p == nil || p.(string) != "rest: nil handler" {
-			t.Error("nil handler not panic")
-		}
-	}()
-	mux := new(ServeMux)
-	mux.Logger = log.Default
-	mux.Handle("", "/:name", nil)
 }
 
 func TestServeMuxError(t *testing.T) {

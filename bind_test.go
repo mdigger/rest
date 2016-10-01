@@ -239,19 +239,19 @@ func TestBind(t *testing.T) {
 	// pretty.Println(v)
 
 	r = httptest.NewRequest("TEST", "/", bytes.NewReader(data))
-	if err = Bind(r, v); err != ErrBadHTTPMethod {
+	if err = Bind(r, v); err != ErrUnsupportedHTTPMethod {
 		t.Error("bind error: unsupported method")
 	}
 
 	r = httptest.NewRequest("POST", "/", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "text/json")
-	if err = Bind(r, v); err != ErrBadContentType {
+	if err = Bind(r, v); err != ErrUnsupportedContentType {
 		t.Error("bind error: unsupported media type")
 	}
 
 	r = httptest.NewRequest("POST", "/", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "application/json; charset=windows-1251")
-	if err = Bind(r, v); err != ErrBadCharset {
+	if err = Bind(r, v); err != ErrUnsupportedCharset {
 		t.Error("bind error: unsupported charset")
 	}
 

@@ -16,10 +16,10 @@ import (
 
 // Bind errors.
 var (
-	ErrBadCharset       = errors.New("unsupported charset")
-	ErrEmptyContentType = errors.New("empty content type")
-	ErrBadContentType   = errors.New("unsupported content type")
-	ErrBadHTTPMethod    = errors.New("unsupported http method")
+	ErrUnsupportedCharset     = errors.New("unsupported charset")
+	ErrEmptyContentType       = errors.New("empty content type")
+	ErrUnsupportedContentType = errors.New("unsupported content type")
+	ErrUnsupportedHTTPMethod  = errors.New("unsupported http method")
 )
 
 // Bind parses the request and populates the received data specified structure.
@@ -34,7 +34,7 @@ func Bind(r *http.Request, v interface{}) (err error) {
 			r.Header.Get("Content-Type"))
 		charset, ok := params["charset"]
 		if ok && strings.ToUpper(charset) != "UTF-8" {
-			err = ErrBadCharset
+			err = ErrUnsupportedCharset
 			break
 		}
 		switch mediatype {
@@ -49,10 +49,10 @@ func Bind(r *http.Request, v interface{}) (err error) {
 		case "":
 			err = ErrEmptyContentType
 		default:
-			err = ErrBadContentType
+			err = ErrUnsupportedContentType
 		}
 	default:
-		err = ErrBadHTTPMethod
+		err = ErrUnsupportedHTTPMethod
 	}
 	return err
 }

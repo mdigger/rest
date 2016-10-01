@@ -43,11 +43,12 @@ func Handlers(handlers ...Handler) Handler {
 	}
 	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
 		for _, handler := range handlers {
-			if code, err := handler(w, r); code != 0 || err != nil {
-				return code, err
+			code, err = handler(w, r)
+			if code != 0 || err != nil {
+				break
 			}
 		}
-		return 0, nil
+		return
 	}
 }
 

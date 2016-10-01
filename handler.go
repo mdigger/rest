@@ -55,20 +55,16 @@ func Handlers(handlers ...Handler) Handler {
 // ServeFile replies to the request with the contents of the named file.
 func ServeFile(filename string) Handler {
 	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
-		var fi os.FileInfo
-		file, err := os.Open(filename)
-		if err == nil {
-			defer file.Close()
-			fi, err = file.Stat()
-		}
-		switch {
+		switch file, err := os.Open(filename); {
 		case err == nil:
+			fi, _ := file.Stat()
 			http.ServeContent(w, r, filename, fi.ModTime(), file)
+			file.Close()
 			return http.StatusOK, nil
 		case os.IsNotExist(err):
-			return http.StatusNotFound, nil
+			return http.StatusNotFound, err
 		case os.IsPermission(err):
-			return http.StatusForbidden, nil
+			return http.StatusForbidden, err
 		default:
 			return http.StatusInternalServerError, err
 		}

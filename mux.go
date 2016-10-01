@@ -122,13 +122,17 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				ctx := context.WithValue(r.Context(), keyParams, params)
 				r = r.WithContext(ctx)
 			}
-			// execute handler
-			fnHandler := handler.(Handler)
-			code, err = fnHandler(w, r)
-			if code == 0 {
+			fnHandler := handler.(Handler) // our handler
+			// use the capturer to intercept the response code if it is unknown
+			srw := &statusResponseWriter{ResponseWriter: w}
+			code, err = fnHandler(srw, r) // execute the handler
+			switch {
+			case code == -1: // all sent but with an unknown code
+				code = srw.Status()
+			case code == 0: // the response was not sent
 				code = http.StatusOK
 				Write(w, r, code, nil)
-			} else if code >= 400 {
+			case code >= 400: // not sent a response with error
 				Write(w, r, code, nil)
 			}
 			// if err != nil && mux.Debug && ctxlog != nil {

@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -39,4 +40,16 @@ func TestRealIP(t *testing.T) {
 	r := httptest.NewRequest("", "/test", nil)
 	addr := RealIP(r)
 	fmt.Println(addr)
+}
+
+func TestStatusResponseWriter(t *testing.T) {
+	w := httptest.NewRecorder()
+	srw := &statusResponseWriter{ResponseWriter: w}
+	_, err := io.WriteString(srw, "<html>test</html>")
+	if err != nil {
+		t.Error(err)
+	}
+	if status := srw.Status(); status != 200 {
+		t.Error("bad status:", status)
+	}
 }

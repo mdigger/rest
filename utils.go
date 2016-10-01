@@ -37,3 +37,32 @@ const (
 	keyOptions                     // write options key
 	keyResponded                   // double response key
 )
+
+// statusResponseWriter is used to catch the response status.
+//
+// Sometimes you need to call some third-party handler http request, which knows
+// what there actually doing. In order to capture the status that he actually
+// gives up, and made this wrapper.
+type statusResponseWriter struct {
+	http.ResponseWriter
+	code int
+}
+
+// WriteHeader writes the header status code of the response.
+func (w *statusResponseWriter) WriteHeader(status int) {
+	w.code = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+// Write writes the data to the connection as part of an HTTP reply.
+func (w *statusResponseWriter) Write(b []byte) (int, error) {
+	if w.code == 0 {
+		w.code = 200
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+// Status returns the sent response status code.
+func (w statusResponseWriter) Status() int {
+	return w.code
+}

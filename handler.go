@@ -17,6 +17,10 @@ import (
 // second return value is for the server. They are completely independent; an
 // error status doesn't always mean the error will be non-nil. (For example,
 // 404 Not Found is not usually a server error.)
+//
+// Use code 0 if the response is not sent. Or -1, if the response is sent, but
+// it is made by a third-party processor and the status code of the sent
+// response is not known.
 type Handler func(w http.ResponseWriter, r *http.Request) (code int, err error)
 
 // ServeHTTP implements http.Handler interface.

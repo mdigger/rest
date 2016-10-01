@@ -82,7 +82,6 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			default:
 				ctxlog.Error(msg)
 			}
-
 		}()
 	}
 
@@ -127,7 +126,7 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			srw := &statusResponseWriter{ResponseWriter: w}
 			code, err = fnHandler(srw, r) // execute the handler
 			switch {
-			case code == -1: // all sent but with an unknown code
+			case code < 0: // all sent but with an unknown code
 				code = srw.Status()
 			case code == 0: // the response was not sent
 				code = http.StatusOK
@@ -135,12 +134,6 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			case code >= 400: // not sent a response with error
 				Write(w, r, code, nil)
 			}
-			// if err != nil && mux.Debug && ctxlog != nil {
-			// 	// add handler name to log
-			// 	name := runtime.FuncForPC(
-			// 		reflect.ValueOf(fnHandler).Pointer()).Name()
-			// 	ctxlog = ctxlog.WithField("handler", name)
-			// }
 			return
 		}
 		// try add/remove slash at the end

@@ -15,7 +15,7 @@ type RedirectURL struct {
 // Redirect causes the URL to absolute relative to the current request and
 // invokes Write with RedirectURL(urlStr).
 func Redirect(w http.ResponseWriter, r *http.Request,
-	status int, urlStr string) (int, error) {
+	code int, urlStr string) (int, error) {
 	// trying to set relative path
 	if u, err := url.Parse(urlStr); err == nil {
 		if u.Scheme == "" && u.Host == "" {
@@ -43,5 +43,5 @@ func Redirect(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	w.Header().Set("Location", urlStr)
-	return Write(w, r, status, &RedirectURL{urlStr})
+	return Write(w, r, code, &RedirectURL{urlStr})
 }

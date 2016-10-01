@@ -15,8 +15,7 @@ func getUser(w http.ResponseWriter, r *http.Request) (int, error) {
 
 func getFile(w http.ResponseWriter, r *http.Request) (int, error) {
 	name := rest.Params(r).Get("filename")
-	http.ServeFile(w, r, name)
-	return http.StatusOK, nil
+	return rest.ServeFile(name)
 }
 
 func Example() {

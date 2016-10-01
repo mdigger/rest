@@ -20,17 +20,10 @@ import (
 // 	/user/:name
 // 	/user/:name/files
 // 	/user/:name/files/*filename
-//
-// If a subtree has been registered and a request is received naming the subtree
-// root without its trailing slash, ServeMux redirects that request to the
-// subtree root (adding the trailing slash). This behavior can be overridden
-// with a separate registration for the path without the trailing slash. For
-// example, registering "/images/" causes ServeMux to redirect a request for
-// "/images" to "/images/", unless "/images" has been registered separately.
 type ServeMux struct {
 	Headers     map[string]string // additional http headers
-	*Options                      // write options
 	NotCompress bool              // disallow compression of the response
+	*Options                      // write options
 	Logger      *log.Context      // logger
 	routers     map[string]*router.Paths
 }

@@ -52,8 +52,8 @@ func Handlers(handlers ...Handler) Handler {
 	}
 }
 
-// ServeFile replies to the request with the contents of the named file.
-func ServeFile(filename string) Handler {
+// ServeFileHandler replies to the request with the contents of the named file.
+func ServeFileHandler(filename string) Handler {
 	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
 		switch file, err := os.Open(filename); {
 		case err == nil:

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"time"
 
 	"github.com/mdigger/rest"
 )
@@ -67,4 +68,37 @@ func ExampleDataAdapter() {
 	}
 	mux := new(rest.ServeMux)
 	mux.Options = opt
+}
+
+func ExampleServeFileHandler() {
+	mux := new(rest.ServeMux)
+	mux.Handle("GET", "/", rest.ServeFileHandler("index.html"))
+}
+
+func ExampleJSON() {
+	data := rest.JSON{
+		"user":       "TestUser",
+		"authorized": time.Now(),
+	}
+	rest.Write(w, r, 200, data)
+}
+
+func ExampleOptions() {
+	opt := &rest.Options{
+		DataAdapter:   rest.Adapter,
+		Encoder:       rest.JSONEncoder(true),
+		AllowMultiple: false,
+	}
+	mux := new(rest.ServeMux)
+	mux.Options = opt
+}
+
+func ExampleServeMux_Handle() {
+	mux := new(rest.ServeMux)
+	mux.Handle("GET", "/user/:nane",
+		func(w http.ResponseWriter, r *http.Request) (code int, err error) {
+			name := rest.Params(r).Get("name")
+			data := rest.JSON{"name": name}
+			return rest.Write(w, r, http.StatusOK, data)
+		})
 }

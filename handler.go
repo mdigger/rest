@@ -36,7 +36,10 @@ func (fn Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Handlers Handler.
+// Handlers allows multiple handlers to one: they will be executed sequentially,
+// as long as any of the handlers do not return non-zero status or error.
+// Usually a direct call to this function is not needed, because ServeMux.Handle
+// calls on its own.
 func Handlers(handlers ...Handler) Handler {
 	if len(handlers) == 1 {
 		return handlers[0]
@@ -52,7 +55,8 @@ func Handlers(handlers ...Handler) Handler {
 	}
 }
 
-// ServeFileHandler replies to the request with the contents of the named file.
+// ServeFileHandler return Handler that replies to the request with the contents
+// of the named file.
 func ServeFileHandler(filename string) Handler {
 	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
 		switch file, err := os.Open(filename); {

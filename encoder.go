@@ -6,6 +6,8 @@ import (
 )
 
 // Encoder describes an object capable of encoding a response.
+//
+// JSONEncoder implements this interface to format JSON.
 type Encoder interface {
 	// ContentType returns a string with the Content-Type to return in response
 	// header.

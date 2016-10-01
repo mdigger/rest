@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 )
 
-// Bind errors.
+// Error returned by the Bind function.
 var (
 	ErrUnsupportedCharset     = errors.New("unsupported charset")
 	ErrEmptyContentType       = errors.New("empty content type")

@@ -10,7 +10,9 @@ import (
 // JSON is just a quick way to describe data structures.
 type JSON map[string]interface{}
 
-// RealIP returns a real IP address from headers.
+// RealIP returns a real IP address from headers. To this end, we use the
+// headers of the http request "X-Forwarded-For" and "X-Real-IP" or a real
+// address from the connection.
 func RealIP(r *http.Request) string {
 	addr := r.RemoteAddr
 	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {

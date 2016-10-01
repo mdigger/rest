@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-// RedirectURL describes the URL to redirect.
+// RedirectURL describes the URL to redirect. The Redirect function is used for
+// transmission of the URL to switch to Write.
 type RedirectURL struct {
 	Redirect string `json:"redirect"`
 }

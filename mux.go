@@ -28,7 +28,10 @@ type ServeMux struct {
 	routers     map[string]*router.Paths
 }
 
-// Handle registers the handler for the given method and pattern.
+// Handle registers the handler for the given method and pattern. If you specify
+// multiple handlers, they will be run sequentially until one of them does not
+// return a non-zero response status code or error. When you specify the path
+// pattern, you can use named parameters.
 func (mux *ServeMux) Handle(method, pattern string, handlers ...Handler) {
 	if method == "" {
 		method = "GET"

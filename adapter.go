@@ -23,12 +23,12 @@ type Response struct {
 // This function represents the responses transmitted by the Write function in
 // the form Response:
 // 	{
-//		"code": 200,
-// 		"status": "OK",
-// 		"success": true,
-// 		"data": {
-//			...
-// 		}
+//	    "code": 200,
+// 	    "status": "OK",
+// 	    "success": true,
+// 	    "data": {
+//	        ...
+// 	    }
 //	}
 func Adapter(w http.ResponseWriter, r *http.Request,
 	code int, data interface{}) (int, interface{}) {

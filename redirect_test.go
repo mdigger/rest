@@ -31,3 +31,9 @@ func TestRedirectEmpty(t *testing.T) {
 		t.Errorf("bad location: %v", location)
 	}
 }
+
+func TestRedirectHndler(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("", "/test", nil)
+	RedirectHandler(301, "/").ServeHTTP(w, r)
+}

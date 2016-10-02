@@ -40,6 +40,10 @@ func TestRealIP(t *testing.T) {
 	r := httptest.NewRequest("", "/test", nil)
 	addr := RealIP(r)
 	fmt.Println(addr)
+	r.Header.Set("X-Real-IP", "127.0.0.1")
+	fmt.Println(RealIP(r))
+	r.Header.Set("X-Forwarded-For", "localhost")
+	fmt.Println(RealIP(r))
 }
 
 func TestStatusResponseWriter(t *testing.T) {

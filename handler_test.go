@@ -38,7 +38,7 @@ func TestMutipleHandlers(t *testing.T) {
 	Handlers(info, info2).ServeHTTP(w, r)
 }
 
-func TestServeFileHandler(t *testing.T) {
+func TestServeMuxHandlers(t *testing.T) {
 	mux := new(ServeMux)
 	mux.Logger = log.Default
 	mux.Handle("GET", "/", ServeFileHandler("index.html"))

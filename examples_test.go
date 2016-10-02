@@ -95,7 +95,7 @@ func ExampleOptions() {
 
 func ExampleServeMux_Handle() {
 	mux := new(rest.ServeMux)
-	mux.Handle("GET", "/user/:nane",
+	mux.Handle("GET", "/user/:name",
 		func(w http.ResponseWriter, r *http.Request) (code int, err error) {
 			name := rest.Params(r).Get("name")
 			data := rest.JSON{"name": name}

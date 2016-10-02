@@ -35,8 +35,14 @@ func Write(w http.ResponseWriter, r *http.Request,
 		opt = defaultOptions
 	}
 	// check double response
-	if !opt.AllowMultiple && r.Context().Value(keyResponded) != nil {
-		panic("rest: multiple responses")
+	if !opt.AllowMultiple {
+		if r.Context().Value(keyResponded) != nil {
+			panic("rest: multiple responses")
+		} else {
+			ctx := context.WithValue(r.Context(), keyResponded, true)
+			nr := r.WithContext(ctx)
+			*r = *nr
+		}
 	}
 	// preprocess response data
 	if opt.DataAdapter != nil {
@@ -49,6 +55,11 @@ func Write(w http.ResponseWriter, r *http.Request,
 	} else {
 		encoder = defaultEncoder // JSON by default
 	}
+	// skip if data nil
+	if data == nil {
+		w.WriteHeader(code)
+		return code, nil
+	}
 	// set response headers
 	w.Header().Set("Content-Type", encoder.ContentType(w, r))
 	w.WriteHeader(code)
@@ -56,12 +67,6 @@ func Write(w http.ResponseWriter, r *http.Request,
 	err := encoder.Encode(w, r, data)
 	if err != nil {
 		return code, err
-	}
-	// disallow double response
-	if !opt.AllowMultiple {
-		ctx := context.WithValue(r.Context(), keyResponded, true)
-		nr := r.WithContext(ctx)
-		*r = *nr
 	}
 	return code, nil
 }

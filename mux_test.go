@@ -90,6 +90,7 @@ func TestError(t *testing.T) {
 		return 500, errors.New("test error")
 	})
 	r := httptest.NewRequest("", "/test", nil)
+	r.Header.Set("Accept-Encoding", "gzip")
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, r)
 }

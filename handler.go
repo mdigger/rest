@@ -1,9 +1,10 @@
 package rest
 
 import (
-	"log"
 	"net/http"
 	"os"
+
+	"github.com/mdigger/log"
 )
 
 // Handler describes an HTTP request handler.
@@ -26,13 +27,14 @@ type Handler func(w http.ResponseWriter, r *http.Request) (code int, err error)
 // ServeHTTP implements http.Handler interface.
 func (fn Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	code, err := fn(w, r)
-	if code == 0 {
+	switch {
+	case code == 0:
 		w.WriteHeader(http.StatusNoContent)
-	} else if code >= 400 {
+	case code >= 400:
 		http.Error(w, http.StatusText(code), code)
 	}
 	if err != nil {
-		log.Println("handler error:", err)
+		log.WithError(err).Error("handler error")
 	}
 }
 

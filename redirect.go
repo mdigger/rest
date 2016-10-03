@@ -50,7 +50,7 @@ func Redirect(w http.ResponseWriter, r *http.Request,
 // RedirectHandler returns a Handler which gives back to the jump at the
 // specified URL.
 func RedirectHandler(code int, urlStr string) Handler {
-	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
+	return func(w http.ResponseWriter, r *http.Request) (int, error) {
 		return Redirect(w, r, code, urlStr)
 	}
 }

@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 )
@@ -33,7 +34,18 @@ func TestRedirectEmpty(t *testing.T) {
 }
 
 func TestRedirectHndler(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("", "/test", nil)
-	RedirectHandler(301, "/").ServeHTTP(w, r)
+	mux := new(ServeMux)
+	mux.Handle("GET", "/", RedirectHandler(301, "https://www.connector73.com/en#softphone"))
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp
+	// dump, err := httputil.DumpResponse(resp, true)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Printf("%s", dump)
 }

@@ -23,6 +23,7 @@ import (
 type ServeMux struct {
 	Headers     map[string]string // additional http headers
 	NotCompress bool              // disallow compression of the response
+	SendErrors  bool              // send error message to the response
 	*Options                      // write options
 	Logger      *log.Context      // logger
 	routers     map[string]*router.Paths
@@ -121,14 +122,18 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// use the capturer to intercept the response code if it is unknown
 			srw := &statusResponseWriter{ResponseWriter: w}
 			code, err = fnHandler(srw, r) // execute the handler
+			var msg interface{}           // empty error message
+			if mux.SendErrors {
+				msg = err // send error to response
+			}
 			switch {
 			case code < 0: // all sent but with an unknown code
 				code = srw.Status()
 			case code == 0: // the response was not sent
 				code = http.StatusOK
-				Write(w, r, code, nil)
+				Write(w, r, code, msg)
 			case code >= 400: // not sent a response with error
-				Write(w, r, code, nil)
+				Write(w, r, code, msg)
 			}
 			return
 		}

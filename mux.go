@@ -1,8 +1,6 @@
 package rest
 
 import (
-	"compress/gzip"
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,12 +19,10 @@ import (
 // 	/user/:name/files
 // 	/user/:name/files/*filename
 type ServeMux struct {
-	Headers     map[string]string // additional http headers
-	NotCompress bool              // disallow compression of the response
-	SendErrors  bool              // send error message to the response
-	*Options                      // write options
-	Logger      *log.Context      // logger
-	routers     map[string]*router.Paths
+	Headers map[string]string // additional http.Headers
+	Encoder Encoder           // data Encoder (used default if nil)
+	Logger  *log.Context      // access logger (if not nil)
+	routers map[string]*router.Paths
 }
 
 // Handle registers the handler for the given method and pattern. If you specify
@@ -52,91 +48,31 @@ func (mux *ServeMux) Handle(method, pattern string, handlers ...Handler) {
 	}
 }
 
-// ServeHTTP implements http.Handler interface.
-func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var (
-		ctxlog *log.Context // log request context
-		code   int          // status code
-		err    error        // handler error
-	)
-	// initialize logging
-	if mux.Logger != nil {
-		started := time.Now()
-		ctxlog = mux.Logger
-		defer func() {
-			ctxlog = ctxlog.WithFields(log.Fields{
-				"code":     code,
-				"duration": time.Since(started),
-			})
-			msg := fmt.Sprintf("%s %s", r.Method, r.RequestURI)
-			switch {
-			case err != nil:
-				ctxlog.WithError(err).Error(msg)
-			case code < 400:
-				ctxlog.Info(msg)
-			case code < 500:
-				ctxlog.Warning(msg)
-			default:
-				ctxlog.Error(msg)
-			}
-		}()
-	}
-
+// Handler is responsible for the selection of the handler and its
+// implementation.
+//
+// If the handler for the given path and method was not found, but there are
+// handlers for other methods, it returns the ErrMethodNotAllowed and the header
+// is passed the list of methods that can be applied to the given path.
+// Otherwise, returns the ErrNotFound.
+func (mux *ServeMux) Handler(c *Context) (err error) {
 	// add HTTP headers
 	if len(mux.Headers) > 0 {
-		responseHeader := w.Header()
 		for key, value := range mux.Headers {
-			responseHeader.Set(key, value)
+			c.SetHeader(key, value)
 		}
 	}
-
-	// add gzip compression
-	if !mux.NotCompress &&
-		strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		// Delete this header so gzipping isn't repeated later in the chain
-		r.Header.Del("Accept-Encoding")
-		w.Header().Set("Content-Encoding", "gzip")
-		gzipWriter := gzip.NewWriter(w)
-		defer gzipWriter.Close()
-		w = gzipResponseWriter{Writer: gzipWriter, ResponseWriter: w}
-		if ctxlog != nil {
-			ctxlog = ctxlog.WithField("gzip", true)
-		}
-	}
-
-	// add write options to request context
-	if mux.Options != nil {
-		ctx := context.WithValue(r.Context(), keyOptions, mux.Options)
-		r = r.WithContext(ctx)
-	}
-
 	// lookup handler for method and path
-	var urlPath = r.URL.Path
-	if routers := mux.routers[r.Method]; routers != nil {
+	var (
+		urlPath = c.Request.URL.Path
+		method  = c.Request.Method
+	)
+	if routers := mux.routers[method]; routers != nil {
 		if handler, params := routers.Lookup(urlPath); handler != nil {
-			if len(params) > 0 { // add params to request context
-				ctx := context.WithValue(r.Context(), keyParams, params)
-				r = r.WithContext(ctx)
-			}
-			fnHandler := handler.(Handler) // our handler
-			// use the capturer to intercept the response code if it is unknown
-			srw := &statusResponseWriter{ResponseWriter: w}
-			code, err = fnHandler(srw, r) // execute the handler
-			var msg interface{}           // empty error message
-			if mux.SendErrors {
-				msg = err // send error to response
-			}
-			switch {
-			case code < 0: // all sent but with an unknown code
-				code = srw.Status()
-			case code == 0: // the response was not sent
-				code = http.StatusOK
-				Write(w, r, code, msg)
-			case code >= 400: // not sent a response with error
-				Write(w, r, code, msg)
-			}
-			return
+			c.params = append(c.params, params...)
+			return handler.(Handler)(c) // execute the request handler
 		}
+
 		// try add/remove slash at the end
 		if strings.HasSuffix(urlPath, "/") {
 			urlPath = strings.TrimSuffix(urlPath, "/")
@@ -144,14 +80,13 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			urlPath += "/"
 		}
 		if handler, _ := routers.Lookup(urlPath); handler != nil {
-			code, err = Redirect(w, r, http.StatusMovedPermanently, urlPath)
-			if ctxlog != nil {
-				ctxlog = ctxlog.WithField("url", urlPath)
+			code := http.StatusMovedPermanently
+			if method != "GET" && method != "HEAD" {
+				code = http.StatusPermanentRedirect
 			}
-			return
+			return c.Redirect(code, urlPath)
 		}
 	}
-
 	// handler for request method not found
 	var methods = make([]string, 0, len(mux.routers))
 	for method, handlers := range mux.routers {
@@ -161,14 +96,70 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(methods) > 0 {
 		// allowed other methods
-		w.Header().Set("Allow", strings.Join(methods, ", "))
-		code, err = Write(w, r, http.StatusMethodNotAllowed, nil)
-		if ctxlog != nil {
-			ctxlog = ctxlog.WithField("allowed", methods)
-		}
-		return
+		c.SetHeader("Allow", strings.Join(methods, ", "))
+		return ErrMethodNotAllowed
 	}
+	return ErrNotFound
+}
 
-	// handler not found for all methods
-	code, err = Write(w, r, http.StatusNotFound, nil)
+// ServeHTTP implements http.Handler interface.
+func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var started = time.Now()
+	var context = newContext(w, r)
+	context.Encoder = mux.Encoder
+	err := mux.Handler(context)
+	if !context.IsWrote() {
+		context.Write(err)
+	}
+	context.close()
+	// output information to the log
+	if mux.Logger != nil {
+		code := context.Status()
+		ctxlog := mux.Logger.WithFields(log.Fields{
+			"code":     code,
+			"duration": time.Since(started),
+			"gzip":     context.Compressed(),
+			"size":     context.ContentLength(),
+			"ip":       context.RealIP(),
+		})
+		msg := fmt.Sprintf("%s %s",
+			context.Request.Method, context.Request.RequestURI)
+		switch {
+		case err != nil:
+			ctxlog.WithError(err).Error(msg)
+		case code < 400:
+			ctxlog.Info(msg)
+		case code < 500:
+			ctxlog.Warning(msg)
+		default:
+			ctxlog.Error(msg)
+		}
+	}
+}
+
+type (
+	// Paths allows to describe multiple handlers for different ways
+	// and methods: the key for this dictionary are path queries.
+	// Used as argument when calling the method ServeMux.Handles.
+	Paths map[string]Methods
+	// Methods allows one to describe handlers for methods.
+	Methods map[string]Handler
+)
+
+// Handles adds from the list of handlers for multiple ways and methods.
+// It is, in fact, just a convenient way to immediately identify a large number
+// of handlers, without causing every time ServeMux.Handle.
+//
+// Optionally, you can specify the list of handlers to be executed before
+// performance of the specified.
+func (mux *ServeMux) Handles(paths Paths, middleware ...Handler) {
+	for path, methods := range paths {
+		for method, handler := range methods {
+			// add middleware for all handlers if they are defined
+			if len(middleware) > 0 {
+				handler = Handlers(append(middleware, handler)...)
+			}
+			mux.Handle(method, path, handler)
+		}
+	}
 }

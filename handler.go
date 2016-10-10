@@ -2,77 +2,93 @@ package rest
 
 import (
 	"net/http"
-	"os"
-
-	"github.com/mdigger/log"
+	"path/filepath"
 )
 
 // Handler describes an HTTP request handler.
-//
-// A simple contract guarantees robust request handling: if a handler returns an
-// error status (>= 400), then the response has not yet been written and the
-// client must still be shown an error message. If the error value is not nil,
-// then something went wrong on the server and it should be logged/reported.
-//
-// In other words, the first return value is for the client's benefit, and the
-// second return value is for the server. They are completely independent; an
-// error status doesn't always mean the error will be non-nil. (For example,
-// 404 Not Found is not usually a server error.)
-//
-// Use code 0 if the response is not sent. Or -1, if the response is sent, but
-// it is made by a third-party processor and the status code of the sent
-// response is not known.
-type Handler func(w http.ResponseWriter, r *http.Request) (code int, err error)
+type Handler func(*Context) error
 
 // ServeHTTP implements http.Handler interface.
-func (fn Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	code, err := fn(w, r)
-	switch {
-	case code == 0:
-		w.WriteHeader(http.StatusNoContent)
-	case code >= 400:
-		http.Error(w, http.StatusText(code), code)
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	c := newContext(w, r)
+	if err := h(c); !c.IsWrote() {
+		c.Write(err)
 	}
-	if err != nil {
-		log.WithError(err).Error("handler error")
-	}
+	c.close()
 }
 
-// Handlers allows multiple handlers to one: they will be executed sequentially,
-// as long as any of the handlers do not return non-zero status or error.
-// Usually a direct call to this function is not needed, because ServeMux.Handle
-// calls on its own.
+// Handlers combines multiple query processors in the queue. They will be
+// executed in the order in which were added one after another until they are
+// all done or until you return the first error, that interrupts the process
+// further processing. As well further processing is interrupted if the handler
+// gave the response to the client. Using this feature allows you to combine
+// multiple processors into one.
 func Handlers(handlers ...Handler) Handler {
-	if len(handlers) == 1 {
+	switch len(handlers) {
+	case 0:
+		return nil
+	case 1:
 		return handlers[0]
-	}
-	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
-		for _, handler := range handlers {
-			code, err = handler(w, r)
-			if code != 0 || err != nil {
-				break
+	default:
+		return func(c *Context) error {
+			for _, h := range handlers {
+				if h == nil {
+					continue
+				}
+				if err := h(c); err != nil {
+					return err
+				}
+				if c.IsWrote() {
+					break
+				}
 			}
+			return nil
 		}
-		return
 	}
 }
 
-// ServeFileHandler return Handler that replies to the request with the contents
-// of the named file.
-func ServeFileHandler(filename string) Handler {
-	return func(w http.ResponseWriter, r *http.Request) (code int, err error) {
-		switch file, err := os.Open(filename); {
-		case err == nil:
-			fi, _ := file.Stat()
-			http.ServeContent(w, r, filename, fi.ModTime(), file)
-			file.Close()
-			return http.StatusOK, nil
-		case os.IsNotExist(err):
-			return http.StatusNotFound, err
-		case os.IsPermission(err):
-			return http.StatusForbidden, err
-		default:
-			return http.StatusInternalServerError, err
-		}
+// Redirect returns a Handler which performs a permanent redirect specified in
+// the URL parameters.
+func Redirect(url string) Handler {
+	return func(c *Context) error {
+		return c.Redirect(http.StatusMovedPermanently, url)
 	}
 }
+
+// File returns the file content.
+func File(name string) Handler {
+	return func(c *Context) error { return c.ServeFile(name) }
+}
+
+// Files gives the files from the specified directory. The file name is set
+// in the way as the last named parameter. Does not display the list of files
+// if the request is for a file directory in contrast to standard functions
+// http.FileServer.
+func Files(dir string) Handler {
+	return func(c *Context) error {
+		if len(c.params) == 0 {
+			return ErrNotFound
+		}
+		filename := filepath.Join(dir, c.params[len(c.params)-1].Value)
+		return c.ServeFile(filename)
+	}
+}
+
+// Data constantly gives specified in the settings data in response to the
+// request.
+func Data(data interface{}, contentType string) Handler {
+	return func(c *Context) error {
+		c.SetContentType(contentType)
+		return c.Write(data)
+	}
+}
+
+func ErrorHandler(err *Error) Handler {
+	return func(*Context) error { return err }
+}
+
+// Predefined error handlers.
+var (
+	NotFound       = ErrorHandler(ErrNotFound)
+	NotImplemented = ErrorHandler(ErrNotImplemented)
+)

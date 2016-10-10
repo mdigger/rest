@@ -1,41 +1,33 @@
 package rest
 
-import (
-	"encoding/json"
-	"net/http"
-)
+import "encoding/json"
 
-// Encoder describes an object capable of encoding a response.
-//
-// JSONEncoder implements this interface to format JSON.
-type Encoder interface {
-	// ContentType returns a string with the Content-Type to return in response
-	// header.
-	ContentType(w http.ResponseWriter, r *http.Request) string
+// Encoder describes an function capable of encoding a response.
+type Encoder func(*Context, interface{}) error
 
-	// Encode writes a serialization of v to http.ResponseWriter, optionally
-	// using additional information from the http.Request to do so.
-	Encode(w http.ResponseWriter, r *http.Request, v interface{}) error
-}
-
-// JSONEncoder is responsible for return information in JSON format. If true,
-// the data will be formatted with indentation.
-type JSONEncoder bool
-
-// ContentType returns a string with the Content-Type to return in response
-// header.
-func (JSONEncoder) ContentType(w http.ResponseWriter, r *http.Request) string {
-	return "application/json; charset=utf-8"
-}
-
-// Encode writes a serialization of v to http.ResponseWriter in JSON format.
-func (indent JSONEncoder) Encode(w http.ResponseWriter, r *http.Request,
-	v interface{}) error {
-	enc := json.NewEncoder(w)
-	if indent {
-		enc.SetIndent("", "    ")
+// defaultEncoder is used as the default Encoder.
+func defaultEncoder(c *Context, v interface{}) error {
+	var code = c.Status()
+	var response = &struct {
+		Code     int         `json:"code"`
+		Success  bool        `json:"success"`
+		Error    string      `json:"error,omitempty"`
+		Location string      `json:"location,omitempty"`
+		Data     interface{} `json:"data,omitempty"`
+	}{
+		Code:    code,
+		Success: code < 400,
 	}
-	return enc.Encode(v)
+	switch data := v.(type) {
+	case error:
+		response.Error = data.Error()
+	case *RedirectURL:
+		response.Location = data.URL
+	default:
+		response.Data = data
+	}
+	c.SetContentType("application/json; charset=utf-8")
+	enc := json.NewEncoder(c.Response)
+	enc.SetIndent("", "    ")
+	return enc.Encode(response)
 }
-
-var defaultEncoder Encoder = JSONEncoder(false)

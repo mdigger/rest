@@ -196,7 +196,7 @@ func TestBind(t *testing.T) {
 	r := httptest.NewRequest("POST", "/", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "application/json")
 	var v = new(BindData)
-	if err = Bind(r, v); err != nil {
+	if err = bind(r, v); err != nil {
 		t.Error("bind error:", err)
 	}
 	if err = testData.Check(v); err != nil {
@@ -210,7 +210,7 @@ func TestBind(t *testing.T) {
 	r = httptest.NewRequest("PUT", "/", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "application/xml")
 	v = new(BindData)
-	if err = Bind(r, v); err != nil {
+	if err = bind(r, v); err != nil {
 		t.Error("bind error:", err)
 	}
 	if err = testData.Check(v); err != nil {
@@ -220,7 +220,7 @@ func TestBind(t *testing.T) {
 	r = httptest.NewRequest("PATCH", "/", bytes.NewReader([]byte(testData.Query())))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	v = new(BindData)
-	if err = Bind(r, v); err != nil {
+	if err = bind(r, v); err != nil {
 		t.Error("bind error:", err)
 	}
 	if err = testData.Check(v); err != nil {
@@ -229,7 +229,7 @@ func TestBind(t *testing.T) {
 
 	r = httptest.NewRequest("GET", "/?"+testData.Query(), nil)
 	v = new(BindData)
-	if err = Bind(r, v); err != nil {
+	if err = bind(r, v); err != nil {
 		t.Error("bind error:", err)
 	}
 	if err = testData.Check(v); err != nil {
@@ -239,31 +239,31 @@ func TestBind(t *testing.T) {
 	// pretty.Println(v)
 
 	r = httptest.NewRequest("TEST", "/", bytes.NewReader(data))
-	if err = Bind(r, v); err != ErrUnsupportedHTTPMethod {
+	if err = bind(r, v); err != ErrUnsupportedHTTPMethod {
 		t.Error("bind error: unsupported method")
 	}
 
 	r = httptest.NewRequest("POST", "/", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "text/json")
-	if err = Bind(r, v); err != ErrUnsupportedContentType {
+	if err = bind(r, v); err != ErrUnsupportedContentType {
 		t.Error("bind error: unsupported media type")
 	}
 
 	r = httptest.NewRequest("POST", "/", bytes.NewReader(data))
 	r.Header.Set("Content-Type", "application/json; charset=windows-1251")
-	if err = Bind(r, v); err != ErrUnsupportedCharset {
+	if err = bind(r, v); err != ErrUnsupportedCharset {
 		t.Error("bind error: unsupported charset")
 	}
 
 	r = httptest.NewRequest("POST", "/", bytes.NewReader(data))
-	if err = Bind(r, v); err != ErrEmptyContentType {
+	if err = bind(r, v); err != ErrEmptyContentType {
 		t.Error("bind error: empty media type")
 	}
 
 	testData = new(BindData)
 	r = httptest.NewRequest("GET", "/?"+testData.Query(), nil)
 	v = new(BindData)
-	if err = Bind(r, v); err != nil {
+	if err = bind(r, v); err != nil {
 		t.Error("bind error:", err)
 	}
 	if err = testData.Check(v); err != nil {
@@ -289,5 +289,5 @@ func TestBindDebug(t *testing.T) {
 	data := `{adfasdf}`
 	r := httptest.NewRequest("POST", "/", strings.NewReader(data))
 	r.Header.Set("Content-Type", "application/json; charset=utf-8")
-	Bind(r, v)
+	bind(r, v)
 }

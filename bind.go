@@ -16,16 +16,16 @@ import (
 
 // Error returned by the Bind function.
 var (
-	ErrUnsupportedCharset     = errors.New("unsupported charset")
-	ErrEmptyContentType       = errors.New("empty content type")
-	ErrUnsupportedContentType = errors.New("unsupported content type")
-	ErrUnsupportedHTTPMethod  = errors.New("unsupported http method")
+	ErrUnsupportedCharset     = &Error{400, "unsupported charset"}
+	ErrEmptyContentType       = &Error{400, "empty content type"}
+	ErrUnsupportedContentType = &Error{400, "unsupported content type"}
+	ErrUnsupportedHTTPMethod  = &Error{400, "unsupported http method"}
 )
 
-// Bind parses the request and populates the received data specified structure.
+// bind parses the request and populates the received data specified structure.
 // Supported parsing of JSON, XML and HTTP form. For HTTP form in the structure,
 // you can use the tag "form:" to specify the name.
-func Bind(r *http.Request, v interface{}) (err error) {
+func bind(r *http.Request, v interface{}) (err error) {
 	switch r.Method {
 	case "GET", "HEAD":
 		err = bindForm(r.URL.Query(), v)

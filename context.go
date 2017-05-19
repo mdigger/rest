@@ -234,6 +234,15 @@ func (c *Context) Param(key string) string {
 	return ""
 }
 
+// Params return all param names
+func (c *Context) Params() []string {
+	list := make([]string, len(c.params))
+	for i, param := range c.params {
+		list[i] = param.Key
+	}
+	return list
+}
+
 // Data returns the user data stored in the request context with specified key.
 // Usually this information is used when you want to pass them between multiple
 // processors.

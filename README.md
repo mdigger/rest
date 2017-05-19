@@ -5,6 +5,7 @@
 
 Package rest is designed for creating RESTful APIs.
 
+- makes it easy to give any objects that support serialization to JSON
 - supports the restriction of only one response to the request
 - have the ability to override the data format before output
 - it is possible to set your headers to output
@@ -12,46 +13,4 @@ Package rest is designed for creating RESTful APIs.
 - ready for logging responses
 - support for named parameters in the path
 
-## Example
-```go
-package main
 
-import (
-	"net/http"
-
-	"github.com/mdigger/log"
-	"github.com/mdigger/rest"
-)
-
-func getUser(w http.ResponseWriter, r *http.Request) (int, error) {
-	name := rest.Params(r).Get("name")
-	data := rest.JSON{"name": name}
-	return rest.Write(w, r, http.StatusOK, data)
-}
-
-func getFile(w http.ResponseWriter, r *http.Request) (int, error) {
-	name := rest.Params(r).Get("filename")
-	http.ServeFile(w, r, name)
-	return http.StatusOK, nil
-}
-
-func main() {
-	mux := &rest.ServeMux{
-		Headers: map[string]string{
-			"X-API-Version": "1.0",
-		},
-		NotCompress: false,
-		Options: &rest.Options{
-			Encoder:       rest.JSONEncoder(true),
-			DataAdapter:   rest.Adapter,
-			AllowMultiple: false,
-		},
-		Debug:  true,
-		Logger: log.Default,
-	}
-	mux.Handle("GET", "/user/:name", getUser)
-	mux.Handle("GET", "/files/*filename", getFile)
-
-	http.ListenAndServe(":8080", mux)
-}
-```

@@ -141,7 +141,7 @@ func setWithProperType(valueKind reflect.Kind,
 		structField.SetString(val)
 		return nil
 	default:
-		return errors.New("unknown type")
+		return errors.New("unsupported field type")
 	}
 }
 

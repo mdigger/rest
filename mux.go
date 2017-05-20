@@ -114,8 +114,9 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	context.close()
 	// output information to the log
 	if mux.Logger != nil {
+		ctxlog := mux.Logger.WithFields(context.logFields)
 		code := context.Status()
-		ctxlog := mux.Logger.WithFields(log.Fields{
+		ctxlog = ctxlog.WithFields(log.Fields{
 			"code":     code,
 			"duration": time.Since(started),
 			"gzip":     context.Compressed(),

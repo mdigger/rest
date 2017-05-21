@@ -279,8 +279,8 @@ func TestBindForm(t *testing.T) {
 	}
 
 	err = setWithProperType(reflect.Complex64, "val", reflect.ValueOf(nil))
-	if err.Error() != "unknown type" {
-		t.Error("unknown type")
+	if err.Error() != "unsupported field type" {
+		t.Error("unsupported field type")
 	}
 }
 

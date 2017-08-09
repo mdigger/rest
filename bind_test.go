@@ -291,3 +291,22 @@ func TestBindDebug(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json; charset=utf-8")
 	bind(r, v)
 }
+
+func TestFormWithPtr(t *testing.T) {
+	var data = url.Values{
+		"readed": {"true"},
+		"note":   {"text note"},
+		"b":      {"123"},
+	}
+	var obj = new(struct {
+		Readed *bool
+		Note   *string
+		B      *int
+	})
+	req := httptest.NewRequest("PATCH", "/", strings.NewReader(data.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := bind(req, obj); err != nil {
+		t.Error(err)
+	}
+	// pretty.Println(obj)
+}

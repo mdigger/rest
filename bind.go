@@ -110,7 +110,18 @@ func bindForm(data url.Values, v interface{}) error {
 
 func setWithProperType(valueKind reflect.Kind,
 	val string, structField reflect.Value) error {
+	// log.WithFields(log.Fields{
+	// 	"valueKind":   valueKind,
+	// 	"val":         val,
+	// 	"structField": structField,
+	// }).Info("setWithProperType")
+
 	switch valueKind {
+	case reflect.Ptr:
+		if structField.IsNil() {
+			structField.Set(reflect.New(structField.Type().Elem()))
+		}
+		return setWithProperType(structField.Elem().Kind(), val, structField.Elem())
 	case reflect.Int:
 		return setIntField(val, 0, structField)
 	case reflect.Int8:
@@ -141,6 +152,11 @@ func setWithProperType(valueKind reflect.Kind,
 		structField.SetString(val)
 		return nil
 	default:
+		// log.WithFields(log.Fields{
+		// 	"valueKind":   valueKind,
+		// 	"val":         val,
+		// 	"structField": structField,
+		// }).Warning("unsupported field type")
 		return errors.New("unsupported field type")
 	}
 }

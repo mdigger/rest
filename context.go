@@ -128,7 +128,7 @@ func (c *Context) Bind(v interface{}) error {
 }
 
 // JSON is just a quick way to describe data structures.
-type JSON map[string]interface{}
+type JSON = map[string]interface{}
 
 // RedirectURL is used for output redirect.
 type RedirectURL struct {

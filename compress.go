@@ -10,7 +10,7 @@ var CompressMimeTypes = map[string][]string{
 	"text":        {"*"},
 	"application": {"json", "*+json", "xml", "*+xml", "javascript", "x-javascript", "x-font-ttf"},
 	"image":       {"*+xml", "bmp", "vnd.microsoft.icon", "x-icon"},
-	"audio":       {"wave", "aiff", "basic"},
+	"audio":       {"wave", "aiff", "basic", "x-wav"},
 	"font":        {"eot", "opentype"},
 }
 

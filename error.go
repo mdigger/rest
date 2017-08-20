@@ -31,3 +31,11 @@ type Error struct {
 func (e *Error) Error() string {
 	return e.Message
 }
+
+// NewError returns a new error with the specified code and message.
+func NewError(code int, msg string) *Error {
+	return &Error{
+		Code:    code,
+		Message: msg,
+	}
+}

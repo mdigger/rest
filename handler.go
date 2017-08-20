@@ -83,6 +83,8 @@ func Data(data interface{}, contentType string) Handler {
 	}
 }
 
+// ErrorHandler returns the handler of http requests, which always returns
+// the specified error.
 func ErrorHandler(err *Error) Handler {
 	return func(*Context) error { return err }
 }

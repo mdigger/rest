@@ -161,8 +161,8 @@ func (c *Context) Write(data interface{}) (err error) {
 		_, err = io.Copy(c.Response, data)
 	case *RedirectURL:
 		c.SetStatus(data.Code)
-		if newUrl, err := c.Request.URL.Parse(data.URL); err == nil {
-			data.URL = newUrl.String()
+		if newURL, err := c.Request.URL.Parse(data.URL); err == nil {
+			data.URL = newURL.String()
 		}
 		c.SetHeader("Location", data.URL)
 		err = encoder(c, data)

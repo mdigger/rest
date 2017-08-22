@@ -29,7 +29,7 @@ func bind(r *http.Request, v interface{}) (err error) {
 	switch r.Method {
 	case "GET", "HEAD":
 		err = bindForm(r.URL.Query(), v)
-	case "POST", "PUT", "PATCH", "DELETE":
+	case "POST", "PUT", "PATCH":
 		mediatype, params, _ := mime.ParseMediaType(
 			r.Header.Get("Content-Type"))
 		charset, ok := params["charset"]

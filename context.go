@@ -174,6 +174,8 @@ func (c *Context) Write(data interface{}) (err error) {
 			code = http.StatusNotFound
 		} else if os.IsPermission(data) {
 			code = http.StatusForbidden
+		} else if timeout, ok := data.(net.Error); ok && timeout.Timeout() {
+			code = http.StatusRequestTimeout
 		}
 		c.SetStatus(code)
 		err = encoder(c, data)

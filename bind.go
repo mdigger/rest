@@ -185,7 +185,7 @@ func setUintField(value string, bitSize int, field reflect.Value) error {
 
 func setBoolField(value string, field reflect.Value) error {
 	if value == "" {
-		value = "false"
+		value = "true"
 	}
 	boolVal, err := strconv.ParseBool(value)
 	if err == nil {

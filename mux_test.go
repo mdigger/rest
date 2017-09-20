@@ -28,7 +28,7 @@ func TestServeMux(t *testing.T) {
 	mux.Headers = map[string]string{
 		"X-Server-API": "1.0",
 	}
-	mux.Logger = log.Default
+	mux.Logger = log.New("http")
 	mux.Handles(Paths{
 		"/": {
 			"GET": func(c *Context) error {

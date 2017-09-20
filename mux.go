@@ -21,7 +21,7 @@ import (
 type ServeMux struct {
 	Headers map[string]string // additional http.Headers
 	Encoder Encoder           // data Encoder (used default if nil)
-	Logger  *log.Context      // access logger (if not nil)
+	Logger  *log.Logger       // access logger (if not nil)
 	routers map[string]*router.Paths
 }
 

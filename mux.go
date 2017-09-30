@@ -114,26 +114,25 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	context.close()
 	// output information to the log
 	if mux.Logger != nil {
-		ctxlog := mux.Logger.WithFields(context.logFields)
 		code := context.Status()
-		ctxlog = ctxlog.WithFields(log.Fields{
-			"code":     code,
-			"duration": time.Since(started),
-			"gzip":     context.Compressed(),
-			"size":     context.ContentLength(),
-			"ip":       context.RealIP(),
-		})
 		msg := fmt.Sprintf("%s %s",
 			context.Request.Method, context.Request.RequestURI)
+		log := mux.Logger.With(
+			"code", code,
+			context.logFields,
+			"size", context.ContentLength(),
+			"duration", time.Since(started),
+			"gzip", context.Compressed(),
+			"ip", context.RealIP())
 		switch {
 		case err != nil:
-			ctxlog.WithError(err).Error(msg)
+			log.Error(msg, err)
 		case code < 400:
-			ctxlog.Info(msg)
+			log.Info(msg)
 		case code < 500:
-			ctxlog.Warning(msg)
+			log.Warn(msg)
 		default:
-			ctxlog.Error(msg)
+			log.Error(msg)
 		}
 	}
 }

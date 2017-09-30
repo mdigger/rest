@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mdigger/log"
 	"github.com/mdigger/router"
 )
 
@@ -21,7 +22,7 @@ type Context struct {
 	params        router.Params               // path named params
 	data          map[interface{}]interface{} // request context data
 	query         url.Values                  // url query values
-	logFields     map[string]interface{}      // additional log fields
+	logFields     []log.Field                 // additional log fields
 }
 
 // newContext return new initialized request context.
@@ -270,10 +271,7 @@ func (c *Context) SetData(key, value interface{}) {
 
 // AddLogField add named filed to context log.
 func (c *Context) AddLogField(key string, value interface{}) {
-	if c.logFields == nil {
-		c.logFields = make(map[string]interface{})
-	}
-	c.logFields[key] = value
+	c.logFields = append(c.logFields, log.Field{Name: key, Value: value})
 }
 
 // RealIP returns a real IP address from headers. To this end, we use the

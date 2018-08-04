@@ -123,7 +123,8 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"size", context.ContentLength(),
 			"duration", time.Since(started),
 			"gzip", context.Compressed(),
-			"ip", context.RealIP())
+			// "ip", context.RealIP(),
+		)
 		switch {
 		case err != nil:
 			log.Error(msg, err)

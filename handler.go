@@ -94,3 +94,38 @@ var (
 	NotFound       = ErrorHandler(ErrNotFound)
 	NotImplemented = ErrorHandler(ErrNotImplemented)
 )
+
+// HTTPHandler преобразует http.Handler в Handler.
+func HTTPHandler(h http.Handler) Handler {
+	return func(c *Context) error {
+		h.ServeHTTP(c.Response, c.Request)
+		return nil
+	}
+}
+
+// HTTPFiles обеспечивает отдачу файлов с помощью http.Dir и аналогичных
+// вещей, которые поддерживают интерфейс http.FileSystem.
+func HTTPFiles(files http.FileSystem, index string) Handler {
+	return func(c *Context) error {
+		if len(c.params) == 0 {
+			return ErrNotFound
+		}
+		// получаем последний параметр, определенный в пути
+		var name = c.params[len(c.params)-1].Value
+		// подставляем имя для корневого элемента
+		if name == "" {
+			name = index
+		}
+		// отдаем содержимое файла
+		file, err := files.Open(name)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		fi, err := file.Stat()
+		if err != nil {
+			return err
+		}
+		return c.ServeContent(name, fi.ModTime(), file)
+	}
+}

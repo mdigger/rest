@@ -224,6 +224,7 @@ func (c *Context) ServeFile(name string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	fi, _ := file.Stat()
 	return c.ServeContent(name, fi.ModTime(), file)
 }
